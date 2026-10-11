@@ -15,6 +15,9 @@ weak, the review goes to a human queue instead of being trusted.
 - **Video:** six frames sampled evenly across the video go to the vision pass, and the
   audio track is transcribed with Azure AI Speech. A breach that is only spoken
   ("guaranteed returns") is caught the same as one on screen.
+- **Chinese and English:** a note written in Chinese is translated for retrieval (the
+  policy corpus and its graph are English), and the answer comes back in Chinese.
+  Clauses are always quoted in the English original.
 - **Decision:** Azure OpenAI with structured outputs (Pydantic).
 - **Confidence:** token logprobs, semantic entropy across samples, and a groundedness
   check.
@@ -82,6 +85,7 @@ the first signal shows as n/a and routing uses the other two. It is never estima
 | Image input (Open WebUI upload, or `images` on `/api/review`): vision observation, image passed to every judge call, "What the agent saw" shown to the reviewer | Implemented, verified live |
 | Logprob, agreement and groundedness signals; threshold routing with reasons | Implemented, unit-tested |
 | Video input: evenly sampled frames + Azure AI Speech transcript of the audio; upload at `/submit`, `POST /api/review-video`, or a video URL pasted into chat (public hosts only, 50 MB cap) | Implemented, verified live |
+| Chinese input: language detection, English translation for retrieval, original kept for the judge, rationale and UI labels in Chinese | Implemented, verified live |
 | Every review stored in SQLite, with its route, image and signals | Implemented |
 | Review queue page at `/review`: approve, or override with the correct verdict, deciding clauses and a note | Implemented, verified live |
 | Report an auto-decided review as wrong (`POST /api/reviews/{id}/flag`), pulling it into the queue | Implemented |
@@ -161,6 +165,22 @@ every signal at 100%. The compliant beer spot was judged correctly but escalated
 rationale made no policy claim, so groundedness scored 0. That is conservative by
 design: an `allowed` with nothing behind it goes to a person.
 
+### Chinese input and cross-language consistency
+
+`eval/heldout_zh.yaml` is the 24 held-out text cases in Simplified Chinese, with the same
+labels. `compliance-agent compare` pairs each Chinese case with its English twin.
+
+| Metric | English | Chinese |
+| --- | --- | --- |
+| Verdict accuracy (24 text cases) | 91.7% | 91.7% |
+| Escalated to human review | 20.8% | 20.8% |
+| Same verdict in both languages | 22 / 24 (91.7%) | |
+
+The two disagreements went one each way. On crash footage with no warning (h02) the
+Chinese run was right and the English run wrong. On a like-for-like broadband
+comparison (h23) it was the reverse. With one run per language that looks like sampling
+noise, not a language gap, but two runs cannot prove it.
+
 ### Threshold calibration, and why the defaults stayed
 
 `compliance-agent calibrate` re-routes recorded cases under every combination of
@@ -218,6 +238,7 @@ uv run compliance-agent eval --out eval/results_new.json
 uv run compliance-agent export-feedback --out eval/feedback.yaml   # resolved reviews → cases
 uv run compliance-agent eval --scenarios eval/feedback.yaml          # re-run them
 uv run compliance-agent eval --scenarios eval/heldout.yaml --out eval/heldout_new.json
+uv run compliance-agent compare eval/heldout_run1.json eval/heldout_zh_run1.json
 uv run compliance-agent calibrate eval/dev_run*.json --target 0.97 --svg docs/calibration.svg
 RETRIEVER=offline uv run compliance-agent retrieve "<scenario>"   # no API calls
 uv run pytest -q
@@ -243,6 +264,7 @@ src/compliance_agent/
   cli.py
 eval/scenarios.yaml         dev set: labelled scenarios (text and image)
 eval/heldout.yaml           held-out set, never used for tuning
+eval/heldout_zh.yaml        the held-out text cases in Simplified Chinese
 eval/*.json                 recorded runs, signals included
 docs/calibration.svg        routing trade-off chart
 eval/video.yaml             video cases

@@ -61,10 +61,14 @@ class Case:
     observation: MediaObservation | None = None
     transcript: str | None = None  # audio track of a video, if any
     is_video: bool = False  # images are frames sampled from one video, in time order
+    language: str = "en"  # language of the reviewer's text; answers come back in it
+    english_text: str | None = None  # translation used for retrieval when not English
 
     def query_text(self) -> str:
-        """Text used for retrieval, which LightRAG requires to be text only."""
-        parts = [self.text]
+        """Text used for retrieval, which LightRAG requires to be text only. The policy
+        corpus and its graph are English, so a non-English note is searched by its
+        translation."""
+        parts = [self.english_text or self.text]
         if self.transcript:
             parts.append(f"Audio / voice-over: {self.transcript}")
         if self.observation is None:
@@ -79,6 +83,31 @@ class Case:
             parts.append("Products: " + "; ".join(o.products))
         parts.append("Disclosures: " + ("; ".join(o.disclosures) or "none visible"))
         return "\n".join(parts)
+
+    def judge_text(self) -> str:
+        """What the judge reads: the retrieval text, plus the original wording when the
+        note was translated, so nothing is lost in translation."""
+        if self.english_text is None:
+            return self.query_text()
+        name = LANGUAGE_NAMES.get(self.language, self.language)
+        return f"Original note ({name}): {self.text}\n{self.query_text()}"
+
+
+LANGUAGE_NAMES = {"en": "English", "zh": "Simplified Chinese"}
+
+
+def detect_language(text: str) -> str:
+    """'zh' when CJK characters make up a fifth or more of the letters, else 'en'."""
+    letters = [ch for ch in text if ch.isalpha()]
+    if not letters:
+        return "en"
+    cjk = sum(1 for ch in letters if "\u4e00" <= ch <= "\u9fff")
+    return "zh" if cjk / len(letters) >= 0.2 else "en"
+
+
+TRANSLATE_SYSTEM = """Translate the user's note about a piece of broadcast or advertising
+content into plain English, for searching an English policy corpus. Keep brand names,
+numbers and quoted on-screen text as they are. Return only the translation."""
 
 
 def _image_parts(images: list[str]) -> list[dict]:
@@ -95,6 +124,8 @@ def build_context(retrieval: RetrievalResult) -> str:
 
 
 class Judge(Protocol):
+    async def to_english(self, text: str) -> str: ...
+
     async def observe(self, case: Case) -> MediaObservation: ...
 
     async def decide(
@@ -136,7 +167,13 @@ class OpenAIJudge:
         self.settings = settings
 
     def _messages(self, case: Case, retrieval: RetrievalResult) -> list[dict]:
-        text = f"{build_context(retrieval)}\n\nSCENARIO:\n{case.query_text()}"
+        text = f"{build_context(retrieval)}\n\nSCENARIO:\n{case.judge_text()}"
+        if case.language != "en":
+            name = LANGUAGE_NAMES.get(case.language, case.language)
+            text += (
+                f"\n\nANSWER LANGUAGE: write the rationale and required changes in {name}. "
+                "Keep clause IDs exactly as written."
+            )
         content = [{"type": "text", "text": text}, *_image_parts(case.images)]
         return [
             {"role": "system", "content": DECIDE_SYSTEM},
@@ -148,8 +185,20 @@ class OpenAIJudge:
             model=self.settings.judge_model, messages=messages, response_format=schema, **extra
         )
 
+    async def to_english(self, text):
+        extra = {} if self.settings.judge_is_reasoning else {"temperature": 0}
+        resp = await self.client.chat.completions.create(
+            model=self.settings.judge_model,
+            messages=[
+                {"role": "system", "content": TRANSLATE_SYSTEM},
+                {"role": "user", "content": text},
+            ],
+            **extra,
+        )
+        return (resp.choices[0].message.content or "").strip()
+
     async def observe(self, case):
-        note = f"Reviewer's note: {case.text}"
+        note = f"Reviewer's note: {case.judge_text() if case.english_text else case.text}"
         if case.is_video:
             note += (
                 f"\nThe {len(case.images)} images are frames sampled in time order from one "

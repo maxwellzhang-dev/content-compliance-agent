@@ -161,3 +161,36 @@ def export_feedback(store, out: Path | str) -> int:
         cases.append(case)
     out.write_text(yaml.safe_dump(cases, sort_keys=False, allow_unicode=True), encoding="utf-8")
     return len(cases)
+
+
+def compare(a: Path | str, b: Path | str, prefix: str = "zh-") -> dict:
+    """Cross-run consistency: match cases by ID (ignoring `prefix`) and report how often
+    the two runs reach the same verdict, and where they differ."""
+    import json
+
+    def load(path):
+        return {
+            c["id"].removeprefix(prefix): c
+            for c in json.loads(Path(path).read_text(encoding="utf-8"))["cases"]
+            if not c.get("error")
+        }
+
+    ra, rb = load(a), load(b)
+    shared = sorted(ra.keys() & rb.keys())
+    same = [k for k in shared if ra[k]["got"] == rb[k]["got"]]
+    return {
+        "matched_cases": len(shared),
+        "same_verdict": len(same),
+        "consistency": round(len(same) / len(shared), 3) if shared else None,
+        "accuracy_a": _accuracy_dicts([ra[k] for k in shared]),
+        "accuracy_b": _accuracy_dicts([rb[k] for k in shared]),
+        "differences": [
+            {"id": k, "a": ra[k]["got"], "b": rb[k]["got"], "expected": ra[k]["expected"]}
+            for k in shared
+            if k not in same
+        ],
+    }
+
+
+def _accuracy_dicts(cases: list[dict]) -> float | None:
+    return round(sum(c["got"] == c["expected"] for c in cases) / len(cases), 3) if cases else None

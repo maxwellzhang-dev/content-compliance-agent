@@ -8,7 +8,7 @@ from pathlib import Path
 
 from . import confidence as conf
 from .config import Settings
-from .judge import Case, Judge
+from .judge import Case, Judge, detect_language
 from .schemas import Confidence, Review
 from .store import ReviewStore
 from .video import gather_evidence
@@ -33,6 +33,9 @@ class ComplianceAgent:
         self, scenario: str, images: list[str] | None = None, video: str | Path | None = None
     ) -> Review:
         case = Case(text=scenario or "Review the attached content.", images=list(images or []))
+        case.language = detect_language(case.text)
+        if case.language != "en":
+            case.english_text = await self.judge.to_english(case.text)
         if video is not None:
             evidence = await gather_evidence(video, self.transcriber)
             case.images, case.transcript, case.is_video = evidence.frames, evidence.transcript, True
@@ -61,6 +64,7 @@ class ComplianceAgent:
             scenario=case.text,
             observation=case.observation,
             transcript=case.transcript,
+            language=case.language,
             media="video" if case.is_video else ("image" if case.images else "text"),
             decision=decision,
             retrieved=retrieval.clauses,

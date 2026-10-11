@@ -99,6 +99,10 @@ def main() -> None:
     k.add_argument("results", nargs="+", help="results JSON files from `eval --out`, pooled")
     k.add_argument("--target", type=float, default=0.95, help="minimum auto accuracy")
     k.add_argument("--svg", help="write the trade-off chart here")
+    m = sub.add_parser("compare", help="verdict consistency between two runs (e.g. en vs zh)")
+    m.add_argument("a")
+    m.add_argument("b")
+    m.add_argument("--prefix", default="zh-", help="ID prefix to ignore when matching")
     f = sub.add_parser("export-feedback", help="turn resolved reviews into eval cases")
     f.add_argument("--out", default="eval/feedback.yaml")
     s = sub.add_parser("serve", help="run the API (OpenAI-compatible + JSON)")
@@ -137,6 +141,10 @@ def main() -> None:
             Path(args.svg).parent.mkdir(parents=True, exist_ok=True)
             Path(args.svg).write_text(cal.render_svg(points, front, marks), encoding="utf-8")
             print(f"\nchart written to {args.svg}")
+    elif args.cmd == "compare":
+        from .evaluate import compare
+
+        print(json.dumps(compare(args.a, args.b, args.prefix), indent=2, ensure_ascii=False))
     elif args.cmd == "export-feedback":
         from .evaluate import export_feedback
         from .store import ReviewStore

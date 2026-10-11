@@ -83,6 +83,7 @@ class Review(BaseModel):
     observation: MediaObservation | None = None
     transcript: str | None = None  # audio of a reviewed video
     media: str = "text"  # "text" | "image" | "video"
+    language: str = "en"  # language the reviewer wrote in; the answer uses it too
     decision: Decision
     retrieved: list[RetrievedClause]
     confidence: Confidence

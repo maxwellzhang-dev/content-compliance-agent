@@ -31,6 +31,10 @@ class FakeJudge:
             required_changes=[],
         )
 
+    async def to_english(self, text):
+        self.translated = text
+        return "A beer advert during the Saturday cartoon block."
+
     async def observe(self, case):
         self.observed = case
         return MediaObservation(
