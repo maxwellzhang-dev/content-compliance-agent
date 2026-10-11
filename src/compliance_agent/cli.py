@@ -61,12 +61,12 @@ async def _ask(scenario: str, settings, as_json: bool) -> None:
     print(review.model_dump_json(indent=2) if as_json else render_markdown(review))
 
 
-async def _eval(settings, out: str | None) -> None:
-    from .evaluate import load_scenarios, run, summarise
+async def _eval(settings, out: str | None, scenarios: str | None) -> None:
+    from .evaluate import DEFAULT_SCENARIOS, load_scenarios, run, summarise
 
     agent = _agent(settings)
     try:
-        results = await run(agent, load_scenarios())
+        results = await run(agent, load_scenarios(scenarios or DEFAULT_SCENARIOS))
     finally:
         await agent.retriever.stop()
     for r in results:
@@ -94,6 +94,9 @@ def main() -> None:
     a.add_argument("--json", action="store_true")
     e = sub.add_parser("eval", help="run the labelled scenarios")
     e.add_argument("--out")
+    e.add_argument("--scenarios", help="YAML file of cases (default eval/scenarios.yaml)")
+    f = sub.add_parser("export-feedback", help="turn resolved reviews into eval cases")
+    f.add_argument("--out", default="eval/feedback.yaml")
     s = sub.add_parser("serve", help="run the API (OpenAI-compatible + JSON)")
     s.add_argument("--host", default="127.0.0.1")
     s.add_argument("--port", type=int, default=8000)
@@ -107,7 +110,13 @@ def main() -> None:
     elif args.cmd == "ask":
         asyncio.run(_ask(args.scenario, settings, args.json))
     elif args.cmd == "eval":
-        asyncio.run(_eval(settings, args.out))
+        asyncio.run(_eval(settings, args.out, args.scenarios))
+    elif args.cmd == "export-feedback":
+        from .evaluate import export_feedback
+        from .store import ReviewStore
+
+        n = export_feedback(ReviewStore(settings.review_db_path), args.out)
+        print(f"wrote {n} cases to {args.out}")
     elif args.cmd == "serve":
         import uvicorn
 

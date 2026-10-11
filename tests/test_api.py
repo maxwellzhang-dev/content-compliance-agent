@@ -65,17 +65,15 @@ def test_api_key_is_enforced(make_agent, settings):
         assert ok.status_code == 200
 
 
-def test_escalated_review_appears_on_queue_page(retriever, settings):
-    from compliance_agent.agent import ComplianceAgent
-    from tests.conftest import FakeJudge
-
-    agent = ComplianceAgent(retriever, FakeJudge(prob=0.5), settings)
+def test_escalated_review_appears_on_queue_page(make_agent, settings):
+    agent = make_agent(prob=0.5)
     with TestClient(create_app(agent=agent, settings=settings)) as c:
         r = c.post("/api/review", json={"scenario": "Beer <b>in</b> cartoons"})
         assert r.status_code == 200, r.text
         page = c.get("/review").text
     assert "Beer &lt;b&gt;in&lt;/b&gt; cartoons" in page
-    assert "verdict probability 0.50" in page or "verdict probability 50%" in page
+    assert "verdict probability 50%" in page
+    assert 'action="/review/1"' in page
 
 
 PIXEL = (

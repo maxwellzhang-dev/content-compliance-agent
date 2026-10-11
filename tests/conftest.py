@@ -10,6 +10,7 @@ from compliance_agent.embeddings import HashingEmbedder
 from compliance_agent.policies import load_corpus
 from compliance_agent.retrieval import OfflineHybridRetriever
 from compliance_agent.schemas import ClaimCheck, Decision, MediaObservation, Verdict
+from compliance_agent.store import ReviewStore
 
 
 class FakeJudge:
@@ -68,7 +69,7 @@ def settings(tmp_path, monkeypatch):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setattr("compliance_agent.config.load_dotenv", lambda: None)
     s = Settings.from_env()
-    return dataclasses.replace(s, review_queue_path=str(tmp_path / "queue.jsonl"))
+    return dataclasses.replace(s, review_db_path=str(tmp_path / "reviews.db"))
 
 
 @pytest.fixture
@@ -79,6 +80,7 @@ def retriever(corpus):
 @pytest.fixture
 def make_agent(retriever, settings):
     def make(**judge_kwargs):
-        return ComplianceAgent(retriever, FakeJudge(**judge_kwargs), settings)
+        store = ReviewStore(settings.review_db_path)
+        return ComplianceAgent(retriever, FakeJudge(**judge_kwargs), settings, store)
 
     return make

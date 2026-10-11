@@ -1,7 +1,7 @@
 .venv
 .env
 rag_storage
-review_queue.jsonl
+reviews.db
 .git
 .pytest_cache
 .ruff_cache

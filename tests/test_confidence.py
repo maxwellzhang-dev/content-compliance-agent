@@ -1,4 +1,3 @@
-import json
 import math
 
 import pytest
@@ -78,8 +77,11 @@ def test_each_weak_signal_escalates_and_is_queued(make_agent, settings, kwargs, 
     review = asyncio.run(_review(make_agent(**kwargs), "A beer advert during cartoons"))
     assert review.route == "human_review"
     assert any(reason in r for r in review.route_reasons)
-    queued = [json.loads(x) for x in open(settings.review_queue_path)]
-    assert queued[-1]["scenario"] == "A beer advert during cartoons"
+    from compliance_agent.store import ReviewStore
+
+    queued = ReviewStore(settings.review_db_path).list("pending")
+    assert queued[0]["scenario"] == "A beer advert during cartoons"
+    assert queued[0]["id"] == review.id
 
 
 def test_missing_logprobs_are_skipped_not_faked(make_agent):

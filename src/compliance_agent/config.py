@@ -29,7 +29,8 @@ class Settings:
     min_verdict_probability: float
     min_agreement: float
     min_groundedness: float
-    review_queue_path: str
+    review_db_path: str
+    review_ui_url: str  # where the /review page is reachable, for links in answers
     api_key: str | None  # bearer token the agent's own API expects, if set
 
     @property
@@ -64,7 +65,8 @@ class Settings:
             min_verdict_probability=_float("MIN_VERDICT_PROBABILITY", 0.85),
             min_agreement=_float("MIN_AGREEMENT", 0.6),
             min_groundedness=_float("MIN_GROUNDEDNESS", 0.75),
-            review_queue_path=os.getenv("REVIEW_QUEUE_PATH", "./review_queue.jsonl"),
+            review_db_path=os.getenv("REVIEW_DB_PATH", "./reviews.db"),
+            review_ui_url=os.getenv("REVIEW_UI_URL", "http://localhost:8000/review"),
             api_key=os.getenv("AGENT_API_KEY") or None,
         )
 

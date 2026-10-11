@@ -4,21 +4,22 @@ score -> route."""
 from __future__ import annotations
 
 import asyncio
-import json
-from datetime import UTC, datetime
-from pathlib import Path
 
 from . import confidence as conf
 from .config import Settings
 from .judge import Case, Judge
 from .schemas import Confidence, Review
+from .store import ReviewStore
 
 
 class ComplianceAgent:
-    def __init__(self, retriever, judge: Judge, settings: Settings) -> None:
+    def __init__(
+        self, retriever, judge: Judge, settings: Settings, store: ReviewStore | None = None
+    ) -> None:
         self.retriever = retriever
         self.judge = judge
         self.settings = settings
+        self.store = store
 
     async def review(self, scenario: str, images: list[str] | None = None) -> Review:
         case = Case(text=scenario or "Review the attached content.", images=list(images or []))
@@ -58,20 +59,6 @@ class ComplianceAgent:
             route_reasons=reasons,
             concepts=retrieval.keywords,
         )
-        if route == "human_review":
-            self._enqueue(review)
+        if self.store is not None:
+            review.id = self.store.add(review, case.images)
         return review
-
-    def _enqueue(self, review: Review) -> None:
-        path = Path(self.settings.review_queue_path)
-        record = {"queued_at": datetime.now(UTC).isoformat(), **review.model_dump(mode="json")}
-        with path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
-
-
-def read_queue(settings: Settings, limit: int = 50) -> list[dict]:
-    path = Path(settings.review_queue_path)
-    if not path.exists():
-        return []
-    lines = path.read_text(encoding="utf-8").splitlines()
-    return [json.loads(line) for line in lines[-limit:]][::-1]

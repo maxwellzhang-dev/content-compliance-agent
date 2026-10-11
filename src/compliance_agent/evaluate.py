@@ -27,7 +27,7 @@ class CaseResult:
     expected: str
     got: str
     route: str
-    recall: float
+    recall: float | None  # None when the case names no deciding clause
     hard: bool
     multimodal: bool = False
     error: str | None = None
@@ -42,20 +42,22 @@ def load_scenarios(path: Path | str = DEFAULT_SCENARIOS) -> list[dict]:
     cases = yaml.safe_load(path.read_text(encoding="utf-8"))
     for case in cases:
         if "image" in case:
-            data = (path.parent / "images" / case["image"]).read_bytes()
-            case["images"] = ["data:image/png;base64," + base64.b64encode(data).decode()]
+            img = path.parent / "images" / case["image"]
+            mime = "jpeg" if img.suffix.lower() in (".jpg", ".jpeg") else img.suffix[1:].lower()
+            data = base64.b64encode(img.read_bytes()).decode()
+            case["images"] = [f"data:image/{mime};base64,{data}"]
     return cases
 
 
 def score_case(case: dict, review: Review) -> CaseResult:
     retrieved = {r.id for r in review.retrieved}
-    wanted = set(case["clauses"])
+    wanted = set(case.get("clauses") or [])
     return CaseResult(
         id=case["id"],
         expected=case["expected"],
         got=review.decision.verdict.value,
         route=review.route,
-        recall=len(wanted & retrieved) / len(wanted),
+        recall=len(wanted & retrieved) / len(wanted) if wanted else None,
         hard=bool(case.get("hard")),
         multimodal=bool(case.get("images")),
     )
@@ -68,7 +70,7 @@ def summarise(results: list[CaseResult]) -> dict:
     wrong = [r for r in results if not r.correct]
     return {
         "cases": n,
-        "retrieval_recall_at_k": round(sum(r.recall for r in results) / n, 3),
+        "retrieval_recall_at_k": _mean([r.recall for r in results if r.recall is not None]),
         "verdict_accuracy": round(sum(r.correct for r in results) / n, 3),
         "auto_routed": len(auto),
         "auto_accuracy": round(sum(r.correct for r in auto) / len(auto), 3) if auto else None,
@@ -80,6 +82,10 @@ def summarise(results: list[CaseResult]) -> dict:
         "errors": sum(1 for r in results if r.error),
         "multimodal_accuracy": _accuracy([r for r in results if r.multimodal]),
     }
+
+
+def _mean(xs: list[float]) -> float | None:
+    return round(sum(xs) / len(xs), 3) if xs else None
 
 
 def _accuracy(results: list[CaseResult]) -> float | None:
@@ -111,3 +117,32 @@ async def run(agent, scenarios: list[dict], concurrency: int = 2) -> list[CaseRe
             return result
 
     return list(await asyncio.gather(*(one(c) for c in scenarios)))
+
+
+def export_feedback(store, out: Path | str) -> int:
+    """Write resolved reviews as eval cases. The reviewer's verdict is the expected
+    answer; images are saved next to the other eval images."""
+    out = Path(out)
+    img_dir = out.parent / "images" / "feedback"
+    cases = []
+    for rec in sorted(
+        store.list("approved", 10_000) + store.list("overridden", 10_000), key=lambda r: r["id"]
+    ):
+        case = {
+            "id": f"fb{rec['id']}",
+            "scenario": rec["scenario"],
+            "expected": rec["reviewer_verdict"],
+            "clauses": rec["reviewer_clauses"],
+            "source": f"review #{rec['id']} ({rec['status']})",
+        }
+        images = [u for u in rec["images"] if u.startswith("data:image/")]
+        if images:
+            header, data = images[0].split(",", 1)
+            ext = header.split("/")[1].split(";")[0]
+            img_dir.mkdir(parents=True, exist_ok=True)
+            name = f"fb{rec['id']}.{ext}"
+            (img_dir / name).write_bytes(base64.b64decode(data))
+            case["image"] = f"feedback/{name}"
+        cases.append(case)
+    out.write_text(yaml.safe_dump(cases, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    return len(cases)

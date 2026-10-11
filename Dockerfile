@@ -7,7 +7,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY src ./src
 COPY policies ./policies
 RUN uv sync --frozen --no-dev
-ENV PATH="/opt/venv/bin:$PATH" RAG_DIR=/data/rag_storage REVIEW_QUEUE_PATH=/data/queue/review_queue.jsonl
+ENV PATH="/opt/venv/bin:$PATH" RAG_DIR=/data/rag_storage REVIEW_DB_PATH=/data/queue/reviews.db
 RUN useradd --create-home --uid 1000 app && mkdir -p /data/queue /data/rag_storage && chown -R app /data
 USER app
 EXPOSE 8000

@@ -78,6 +78,7 @@ class Confidence(BaseModel):
 
 
 class Review(BaseModel):
+    id: int | None = None  # set once stored
     scenario: str
     observation: MediaObservation | None = None
     decision: Decision

@@ -16,7 +16,7 @@ def _pct(x: float | None) -> str:
     return "n/a" if x is None else f"{x:.0%}"
 
 
-def render_markdown(review: Review) -> str:
+def render_markdown(review: Review, queue_url: str | None = None) -> str:
     d, c = review.decision, review.confidence
     lines = [f"### {VERDICT_LABEL[d.verdict]}", ""]
     if review.route == "auto":
@@ -81,4 +81,9 @@ def render_markdown(review: Review) -> str:
     if review.concepts:
         lines += ["", f"Query keywords: {', '.join(review.concepts)}"]
     lines += ["", "</details>"]
+    if review.id is not None:
+        where = (
+            f" · in the [review queue]({queue_url})" if queue_url and review.route != "auto" else ""
+        )
+        lines += ["", f"<sub>Review #{review.id}{where}</sub>"]
     return "\n".join(lines)

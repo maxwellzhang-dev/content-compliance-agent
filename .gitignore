@@ -5,5 +5,5 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 rag_storage/
-review_queue.jsonl
+reviews.db
 .DS_Store

@@ -47,9 +47,9 @@ scenario ──► LightRAG (mix: KG entities/relations + chunk vectors)
       └─────────┴──────────┬───────────────┘
                            ▼
             any signal under threshold? ──► human review queue (/review)
-                           │ no
-                           ▼
-                      auto-decided
+                           │ no                    ▲          │ approve / override
+                           ▼                       │          ▼
+                      auto-decided ── reported ────┘    eval cases (export-feedback)
 ```
 
 | Signal | What it measures | Default threshold |
@@ -75,17 +75,18 @@ the first signal shows as n/a and routing uses the other two. It is never estima
 | Structured decision: verdict, rationale, cited clauses, required changes | Implemented |
 | Image input (Open WebUI upload, or `images` on `/api/review`): vision observation, image passed to every judge call, "What the agent saw" shown to the reviewer | Implemented, verified live |
 | Logprob, agreement and groundedness signals; threshold routing with reasons | Implemented, unit-tested |
-| Human review queue (JSONL) with a page at `/review` | Implemented, read-only |
+| Every review stored in SQLite, with its route, image and signals | Implemented |
+| Review queue page at `/review`: approve, or override with the correct verdict, deciding clauses and a note | Implemented, verified live |
+| Report an auto-decided review as wrong (`POST /api/reviews/{id}/flag`), pulling it into the queue | Implemented |
+| Resolved reviews exported as eval cases (`compliance-agent export-feedback`), reviewer verdict as the expected answer | Implemented |
 | OpenAI-compatible `/v1/models` and `/v1/chat/completions`, streaming included | Implemented |
 | Open WebUI: branding, example prompts, banner, theme CSS, background task calls disabled | Implemented (docker compose) |
 | Evaluation harness: 24 text scenarios (3 marked hard) + 6 image scenarios on synthetic advert mock-ups | Implemented, results below |
 | Offline retriever (concept graph + hashing vectors) for tests and CI | Implemented |
 | CI: ruff and pytest, no network needed | Implemented |
 
-**Planned, not built:** reviewer approve/override actions that feed back into the eval
-set · threshold calibration from eval results · video input (frame sampling) · policy
-versioning · images kept with queued reviews (the queue stores the observation, not the
-image).
+**Planned, not built:** threshold calibration from eval results · video input (frame sampling) · policy
+versioning · login on the review page (it is local-only for now).
 
 ## Evaluation
 
@@ -145,6 +146,8 @@ Other commands:
 ```bash
 uv run compliance-agent retrieve "<scenario>"   # which clauses come back, and from where
 uv run compliance-agent eval --out eval/results_new.json
+uv run compliance-agent export-feedback --out eval/feedback.yaml   # resolved reviews → cases
+uv run compliance-agent eval --scenarios eval/feedback.yaml          # re-run them
 RETRIEVER=offline uv run compliance-agent retrieve "<scenario>"   # no API calls
 uv run pytest -q
 ```
@@ -158,7 +161,9 @@ src/compliance_agent/
   retrieval.py              offline hybrid retriever (tests/CI), shared result type
   judge.py                  decision, sampling and grounding calls; logprob extraction
   confidence.py             the three signals and the routing rule
-  agent.py                  the pipeline and the review queue
+  agent.py                  the pipeline
+  store.py                  SQLite store of every review; flag / resolve
+  review_page.py            the /review queue page
   api.py                    OpenAI-compatible + JSON API, /review page
   render.py                 markdown answer shown in Open WebUI
   evaluate.py, cli.py
