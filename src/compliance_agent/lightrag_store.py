@@ -11,6 +11,7 @@ judge so we control the output schema and get token logprobs.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import re
 from functools import partial
@@ -21,7 +22,7 @@ from lightrag.llm.openai import openai_complete_if_cache, openai_embed
 from lightrag.utils import EmbeddingFunc
 
 from .config import Settings
-from .policies import PolicyCorpus
+from .policies import PolicyCorpus, PolicyDiff, diff_versions
 from .retrieval import RetrievalResult
 from .schemas import RetrievedClause
 from .usage import LightRAGTracker, UsageMeter
@@ -101,18 +102,53 @@ class LightRAGRetriever:
             await self.rag.finalize_storages()
             self._ready = False
 
-    async def index(self) -> dict[str, int]:
-        """Insert every clause and return document counts by status.
+    @property
+    def manifest_path(self) -> Path:
+        return Path(self.settings.rag_dir) / "policy_manifest.json"
 
-        LightRAG skips IDs it already holds and retries failed documents on the next
-        run, so re-running `index` after a rate-limit failure finishes the job."""
+    def indexed_versions(self) -> dict[str, str] | None:
+        """Clause fingerprints as last indexed, or None if never indexed with versions."""
+        if not self.manifest_path.exists():
+            return None
+        return json.loads(self.manifest_path.read_text(encoding="utf-8"))["clauses"]
+
+    def pending_changes(self) -> PolicyDiff:
+        return diff_versions(self.indexed_versions(), self.corpus.versions)
+
+    async def index(self) -> tuple[PolicyDiff, dict[str, int]]:
+        """Bring the index in line with the policy file, touching only what changed.
+
+        Edited clauses are deleted from LightRAG (chunks, entities and relations) and
+        re-inserted; removed clauses are deleted; unchanged ones are left alone. A clause
+        is written to the manifest only once LightRAG reports it processed, so a run
+        cut short by rate limits picks up where it stopped. With no manifest yet,
+        every clause is rebuilt once."""
         await self.start()
-        await self.rag.ainsert(
-            [c.render() for c in self.corpus.clauses],
-            ids=[f"clause-{c.id}" for c in self.corpus.clauses],
-            file_paths=[f"{c.id}.md" for c in self.corpus.clauses],
+        old = self.indexed_versions()
+        diff = diff_versions(old, self.corpus.versions)
+        rebuild = set(diff.changed) | set(diff.added if old is not None else self.corpus.clause_ids)
+        for cid in sorted(set(diff.removed) | (rebuild if old is None else set(diff.changed))):
+            await self.rag.adelete_by_doc_id(f"clause-{cid}")
+        to_insert = [c for c in self.corpus.clauses if c.id in rebuild]
+        if to_insert:
+            await self.rag.ainsert(
+                [c.render() for c in to_insert],
+                ids=[f"clause-{c.id}" for c in to_insert],
+                file_paths=[f"{c.id}.md" for c in to_insert],
+            )
+        manifest = {k: v for k, v in (old or {}).items() if k not in diff.removed}
+        for c in to_insert:
+            status = await self.rag.doc_status.get_by_id(f"clause-{c.id}")
+            state = str((status or {}).get("status", "")).lower()
+            if state.endswith("processed"):
+                manifest[c.id] = c.fingerprint
+            else:
+                manifest.pop(c.id, None)  # retry next run
+        self.manifest_path.write_text(
+            json.dumps({"corpus_version": self.corpus.version, "clauses": manifest}, indent=2),
+            encoding="utf-8",
         )
-        return await self.rag.doc_status.get_status_counts()
+        return diff, await self.rag.doc_status.get_status_counts()
 
     async def retrieve(self, scenario: str) -> RetrievalResult:
         await self.start()
@@ -156,6 +192,7 @@ class LightRAGRetriever:
                     text=c.text,
                     score=round(score, 4),
                     sources=sorted(sources),
+                    version=c.fingerprint,
                 )
             )
         facts = [

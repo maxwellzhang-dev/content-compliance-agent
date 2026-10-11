@@ -79,7 +79,18 @@ def _verdict_options(exclude: str) -> str:
     )
 
 
-def _card(rec: dict) -> str:
+def _changed_since(rec: dict, current: dict[str, str]) -> list[str]:
+    """Cited clauses whose text has changed (or been removed) since this review."""
+    rv = rec["review"]
+    then = {c["id"]: c.get("version", "") for c in rv["retrieved"]}
+    return [
+        cid
+        for cid in rv["decision"]["cited_clauses"]
+        if then.get(cid) and current.get(cid) != then[cid]
+    ]
+
+
+def _card(rec: dict, current: dict[str, str] | None = None) -> str:
     rv = rec["review"]
     d, c = rv["decision"], rv["confidence"]
     v = d["verdict"]
@@ -92,6 +103,9 @@ def _card(rec: dict) -> str:
     reasons = list(rv["route_reasons"])
     if rec.get("flag_reason"):
         reasons.insert(0, f"reported: {rec['flag_reason']}")
+    changed = _changed_since(rec, current or {})
+    if changed:
+        reasons.insert(0, f"policy changed since this review: {', '.join(changed)}")
     reasons_html = "".join(f"<li>{escape(r)}</li>" for r in reasons)
     obs = rv.get("observation")
     kind = "Video" if rv.get("media") == "video" else "Image"
@@ -119,10 +133,11 @@ def _card(rec: dict) -> str:
     else:
         action = ""
     cites = escape(", ".join(d["cited_clauses"]) or "nothing")
+    policy = f" · policy {escape(rv['policy_version'])}" if rv.get("policy_version") else ""
     created = escape(rec["created_at"][:19].replace("T", " "))
     return f"""<article class="card{" has-img" if img else ""}">{img}
 <div class="top"><span class="badge {v}">{VERDICT.get(v, v)}</span>
-<span class="meta"><a href="/review/{rec["id"]}">#{rec["id"]}</a> · cites {cites}</span>
+<span class="meta"><a href="/review/{rec["id"]}">#{rec["id"]}</a> · cites {cites}{policy}</span>
 <time>{created} UTC</time></div>
 <div class="scenario">{escape(rec["scenario"])}</div>
 {seen}<ul class="reasons">{reasons_html}</ul>
@@ -139,7 +154,7 @@ def _page(title: str, body: str) -> str:
 {body}</main></body></html>"""
 
 
-def render_detail(rec: dict) -> str:
+def render_detail(rec: dict, current: dict[str, str] | None = None) -> str:
     """One review in full: the queue card, then everything behind it."""
     rv = rec["review"]
     d = rv["decision"]
@@ -157,15 +172,28 @@ def render_detail(rec: dict) -> str:
         items = "".join(f"<li>{escape(c)}</li>" for c in d["required_changes"])
         extra.append(f'<p class="section">Required changes</p><ol>{items}</ol>')
     by_id = {c["id"]: c for c in rv["retrieved"]}
-    quotes = "".join(
-        f"<blockquote><strong>{escape(cid)}</strong> {escape(by_id[cid]['text'])}</blockquote>"
-        for cid in d["cited_clauses"]
-        if cid in by_id
-    )
+    changed = set(_changed_since(rec, current or {}))
+
+    def quote(cid: str) -> str:
+        c = by_id[cid]
+        ver = (
+            f' <span class="meta">version {escape(c.get("version", ""))}</span>'
+            if c.get("version")
+            else ""
+        )
+        note = (
+            '<p class="meta" style="color:var(--warn)">This clause has changed since the review; '
+            "the text above is the version the agent saw.</p>"
+            if cid in changed
+            else ""
+        )
+        return f"<blockquote><strong>{escape(cid)}</strong>{ver} {escape(c['text'])}{note}</blockquote>"
+
+    quotes = "".join(quote(cid) for cid in d["cited_clauses"] if cid in by_id)
     if quotes:
         extra.append(f'<p class="section">Cited clauses</p>{quotes}')
     links = '<p class="links"><a href="/review">← Review queue</a> · <a href="/submit">Submit content</a></p>'
-    body = f"{links}<h1>Review #{rec['id']}</h1>{_card(rec)}" + "".join(extra)
+    body = f"{links}<h1>Review #{rec['id']}</h1>{_card(rec, current)}" + "".join(extra)
     return _page(f"Review {rec['id']}", body)
 
 
@@ -209,7 +237,9 @@ metered reviews only; reviews stored before metering was added have no usage dat
     return _page("Cost and Latency", body)
 
 
-def render_queue(records: list[dict], tab: str, counts: dict[str, int]) -> str:
+def render_queue(
+    records: list[dict], tab: str, counts: dict[str, int], current: dict[str, str] | None = None
+) -> str:
     tab_counts = {
         "pending": counts.get("pending", 0),
         "resolved": counts.get("approved", 0) + counts.get("overridden", 0),
@@ -220,7 +250,7 @@ def render_queue(records: list[dict], tab: str, counts: dict[str, int]) -> str:
         f"{label}<span>{tab_counts[key]}</span></a>"
         for key, label in TABS
     )
-    body = "".join(_card(r) for r in records) or '<p class="empty">Nothing here.</p>'
+    body = "".join(_card(r, current) for r in records) or '<p class="empty">Nothing here.</p>'
     return _page(
         "Review Queue",
         f"""<p class="links"><a href="/submit">Submit content</a></p>

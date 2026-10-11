@@ -20,10 +20,23 @@ async def _index(settings) -> None:
 
     retriever = LightRAGRetriever(load_corpus(), settings)
     try:
-        counts = await retriever.index()
+        diff, counts = await retriever.index()
+        print(
+            f"policy version {retriever.corpus.version}: "
+            f"{len(diff.added)} added, {len(diff.changed)} changed, {len(diff.removed)} removed"
+        )
+        for label, ids in (
+            ("added", diff.added),
+            ("changed", diff.changed),
+            ("removed", diff.removed),
+        ):
+            if ids:
+                print(f"  {label}: {', '.join(ids)}")
         print(f"document status in {settings.rag_dir}: {counts}")
-        if any(k.lower() != "processed" and v for k, v in counts.items()):
-            raise SystemExit("some clauses did not index; run `compliance-agent index` again")
+        left = retriever.pending_changes()
+        if not left.empty:
+            missing = ", ".join(left.added + left.changed)
+            raise SystemExit(f"not indexed yet: {missing}; run `compliance-agent index` again")
     finally:
         await retriever.stop()
 
@@ -86,7 +99,8 @@ def main() -> None:
 
     p = argparse.ArgumentParser(prog="compliance-agent")
     sub = p.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("index", help="build the LightRAG index from policies/standards.yaml")
+    sub.add_parser("index", help="sync the LightRAG index with policies/standards.yaml")
+    sub.add_parser("policy-diff", help="show policy changes not yet indexed (no API calls)")
     r = sub.add_parser("retrieve", help="show which clauses a scenario retrieves")
     r.add_argument("scenario")
     a = sub.add_parser("ask", help="review one scenario")
@@ -113,6 +127,14 @@ def main() -> None:
     settings = Settings.from_env()
     if args.cmd == "index":
         asyncio.run(_index(settings))
+    elif args.cmd == "policy-diff":
+        from .lightrag_store import LightRAGRetriever
+        from .policies import load_corpus
+
+        retriever = LightRAGRetriever(load_corpus(), settings)
+        d = retriever.pending_changes()
+        print(f"policy version {retriever.corpus.version}")
+        print("index is up to date" if d.empty else json.dumps(d.__dict__, indent=2))
     elif args.cmd == "retrieve":
         asyncio.run(_retrieve(args.scenario, settings))
     elif args.cmd == "ask":

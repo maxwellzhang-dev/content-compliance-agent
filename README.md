@@ -80,6 +80,7 @@ the first signal shows as n/a and routing uses the other two. It is never estima
 | --- | --- |
 | Policy corpus: 20 clauses, 21 linked concepts, validated on load | Implemented |
 | LightRAG indexing, one document per clause, failures reported and retried on re-run | Implemented, verified on Azure OpenAI |
+| Policy versioning: clause fingerprints, incremental re-index (only added / edited / removed clauses touched), policy and clause versions recorded on every review, reviewers warned when a cited clause has changed since | Implemented, verified live |
 | `mix`-mode retrieval mapped back to clause IDs (chunk + graph provenance) | Implemented |
 | Structured decision: verdict, rationale, cited clauses, required changes | Implemented |
 | Image input (Open WebUI upload, or `images` on `/api/review`): vision observation, image passed to every judge call, "What the agent saw" shown to the reviewer | Implemented, verified live |
@@ -230,6 +231,22 @@ Two failure modes stay out of reach of any threshold. The confident misses (h05,
 have the same signals as correct answers. Only labelled data or a better prompt fixes
 those.
 
+### Policy versioning
+
+Every clause has a fingerprint (a hash of its ID, title, text and concepts), and the
+corpus has a version made from all of them. `compliance-agent index` compares the policy
+file with a manifest of what was last indexed. It deletes edited and removed clauses
+from LightRAG, including their chunks, entities and relations, and re-inserts only what
+changed. `compliance-agent policy-diff` shows pending changes without calling any API.
+
+Live check: one word changed in ALC-1. The index reported `0 added, 1 changed, 0
+removed`, the old text was gone from LightRAG's chunks and the new text was in. Reverting
+it re-synced the same way. Retrieval rankings after the round trip matched those before.
+
+Each review records the corpus version and the fingerprint of every clause it saw. When
+a policy changes later, the review queue marks reviews whose cited clauses have changed
+since, and the detail page quotes the version the agent actually judged against.
+
 ## Run it
 
 Requirements: Python 3.11+, [uv](https://docs.astral.sh/uv/), Docker, and an Azure
@@ -240,7 +257,7 @@ variables empty and set `OPENAI_API_KEY`.
 ```bash
 cp .env.example .env          # fill in endpoint, key, deployment names
 uv sync
-uv run compliance-agent index # build the LightRAG index (~1 min, 20 clauses)
+uv run compliance-agent index # sync the LightRAG index with the policy file (~30 s first time)
 uv run compliance-agent ask "A beer brand wants to advertise during the Saturday cartoon block."
 docker compose up -d          # agent on :8000, Open WebUI on :3001
 python openwebui/install_actions.py   # adds the "Report wrong verdict" button

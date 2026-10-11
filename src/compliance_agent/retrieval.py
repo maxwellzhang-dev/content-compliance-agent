@@ -154,6 +154,7 @@ class OfflineHybridRetriever:
                     text=clause.text,
                     score=round(score, 5),
                     sources=sources[cid],
+                    version=clause.fingerprint,
                 )
             )
         facts = [f"scenario concept: {c}" for c in concepts]

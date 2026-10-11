@@ -29,6 +29,9 @@ class ComplianceAgent:
         self.settings = settings
         self.store = store
         self.transcriber = transcriber  # needed for video audio; None = frames only
+        corpus = getattr(retriever, "corpus", None)
+        self.policy_version = corpus.version if corpus is not None else ""
+        self.policy_versions = corpus.versions if corpus is not None else {}
 
     async def review(
         self, scenario: str, images: list[str] | None = None, video: str | Path | None = None
@@ -94,5 +97,6 @@ class ComplianceAgent:
             route=route,
             route_reasons=reasons,
             concepts=retrieval.keywords,
+            policy_version=self.policy_version,
         )
         return review, case.images

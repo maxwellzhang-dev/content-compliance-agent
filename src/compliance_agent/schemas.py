@@ -68,6 +68,7 @@ class RetrievedClause(BaseModel):
     text: str
     score: float
     sources: list[str]  # "graph", "vector", or both
+    version: str = ""  # clause fingerprint at review time
 
 
 class Confidence(BaseModel):
@@ -93,3 +94,4 @@ class Review(BaseModel):
     route_reasons: list[str]
     concepts: list[str] = Field(default_factory=list, description="retriever keywords")
     usage: Usage | None = None  # tokens, stage timings and estimated cost
+    policy_version: str = ""  # corpus version the review was made against

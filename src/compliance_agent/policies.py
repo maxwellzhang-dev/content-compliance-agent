@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -19,6 +21,12 @@ class Clause:
 
     def render(self) -> str:
         return f"[{self.id}] {self.title}\n{self.text}"
+
+    @property
+    def fingerprint(self) -> str:
+        """Short hash of everything that defines the clause. Any edit changes it."""
+        payload = json.dumps([self.id, self.title, self.text, list(self.concepts)])
+        return hashlib.sha256(payload.encode()).hexdigest()[:10]
 
 
 @dataclass(frozen=True)
@@ -42,6 +50,38 @@ class PolicyCorpus:
     @property
     def clause_ids(self) -> set[str]:
         return {c.id for c in self.clauses}
+
+    @property
+    def versions(self) -> dict[str, str]:
+        return {c.id: c.fingerprint for c in self.clauses}
+
+    @property
+    def version(self) -> str:
+        """Version of the whole corpus: changes when any clause is added, edited or removed."""
+        payload = json.dumps(sorted(self.versions.items()))
+        return hashlib.sha256(payload.encode()).hexdigest()[:10]
+
+
+@dataclass(frozen=True)
+class PolicyDiff:
+    added: list[str]
+    changed: list[str]
+    removed: list[str]
+
+    @property
+    def empty(self) -> bool:
+        return not (self.added or self.changed or self.removed)
+
+
+def diff_versions(old: dict[str, str] | None, new: dict[str, str]) -> PolicyDiff:
+    """What changed between an indexed manifest and the current corpus. With no manifest,
+    everything counts as added."""
+    old = old or {}
+    return PolicyDiff(
+        added=sorted(new.keys() - old.keys()),
+        changed=sorted(k for k in new.keys() & old.keys() if new[k] != old[k]),
+        removed=sorted(old.keys() - new.keys()),
+    )
 
 
 def load_corpus(path: Path | str = DEFAULT_POLICY_PATH) -> PolicyCorpus:

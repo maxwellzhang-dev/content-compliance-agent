@@ -217,7 +217,7 @@ def create_app(agent: ComplianceAgent | None = None, settings: Settings | None =
         rec = store(request).get(review_id)
         if rec is None:
             raise HTTPException(status_code=404, detail="no such review")
-        return render_detail(rec)
+        return render_detail(rec, request.app.state.agent.policy_versions)
 
     def store(request: Request) -> ReviewStore:
         st = request.app.state.agent.store
@@ -266,7 +266,7 @@ def create_app(agent: ComplianceAgent | None = None, settings: Settings | None =
         else:
             tab = tab if tab in ("pending", "auto") else "pending"
             records = st.list(tab, limit)
-        return render_queue(records, tab, st.counts())
+        return render_queue(records, tab, st.counts(), request.app.state.agent.policy_versions)
 
     @app.post("/review/{review_id}")
     async def review_form(review_id: int, request: Request):

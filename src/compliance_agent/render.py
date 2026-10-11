@@ -42,6 +42,7 @@ TEXT = {
         "score": "Score",
         "via": "Found via",
         "keywords": "Query keywords",
+        "policy": "Policy version",
         "review": "Review",
         "in_queue": "in the [review queue]({url})",
         "cost": "Cost and latency",
@@ -92,6 +93,7 @@ TEXT = {
         "score": "得分",
         "via": "来源",
         "keywords": "检索关键词",
+        "policy": "政策版本",
         "review": "审核记录",
         "in_queue": "见[复核队列]({url})",
         "cost": "成本与耗时",
@@ -239,6 +241,8 @@ def render_markdown(review: Review, queue_url: str | None = None) -> str:
     ]
     if review.concepts:
         lines += ["", f"{t['keywords']}: {', '.join(review.concepts)}"]
+    if review.policy_version:
+        lines += ["", f"{t['policy']}: `{review.policy_version}`"]
     lines += ["", "</details>"]
     if review.usage is not None:
         lines += ["", *_usage_block(review.usage, t)]
