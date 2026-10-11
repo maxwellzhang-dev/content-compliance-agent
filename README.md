@@ -13,7 +13,8 @@ weak, the review goes to a human queue instead of being trusted.
   (on-screen text, people, products, disclosure labels) becomes part of the retrieval
   query, and the judge then decides with the original image in front of it.
 - **Video:** six frames sampled evenly across the video go to the vision pass, and the
-  audio track is transcribed with Azure AI Speech. A breach that is only spoken
+  audio track is transcribed with Azure AI Speech or, with no Azure key needed, a local
+  faster-whisper model. A breach that is only spoken
   ("guaranteed returns") is caught the same as one on screen.
 - **Chinese and English:** a note written in Chinese is translated for retrieval (the
   policy corpus and its graph are English), and the answer comes back in Chinese.
@@ -85,7 +86,7 @@ the first signal shows as n/a and routing uses the other two. It is never estima
 | Structured decision: verdict, rationale, cited clauses, required changes | Implemented |
 | Image input (Open WebUI upload, or `images` on `/api/review`): vision observation, image passed to every judge call, "What the agent saw" shown to the reviewer | Implemented, verified live |
 | Logprob, agreement and groundedness signals; threshold routing with reasons | Implemented, unit-tested |
-| Video input: evenly sampled frames + Azure AI Speech transcript of the audio; upload at `/submit`, `POST /api/review-video`, or a video URL pasted into chat (public hosts only, 50 MB cap) | Implemented, verified live |
+| Video input: evenly sampled frames + a transcript of the audio (Azure AI Speech, or local faster-whisper via `TRANSCRIBER=local`); upload at `/submit`, `POST /api/review-video`, or a video URL pasted into chat (public hosts only, 50 MB cap) | Implemented, verified live |
 | Chinese input: language detection, English translation for retrieval, original kept for the judge, rationale and UI labels in Chinese | Implemented, verified live |
 | Every review stored in SQLite, with its route, image and signals | Implemented |
 | Cost and latency per review: stage timings, tokens per model (LightRAG's own calls included), audio seconds, estimated USD; shown under each answer and aggregated at `/stats` | Implemented, verified live |
@@ -167,6 +168,25 @@ the screen shows nothing wrong. Live run: 3/3 correct, both spoken breaches caug
 every signal at 100%. The compliant beer spot was judged correctly but escalated. Its
 rationale made no policy claim, so groundedness scored 0. That is conservative by
 design: an `allowed` with nothing behind it goes to a person.
+
+**Transcribing locally.** To run without an Azure Speech resource, install the
+optional `local-asr` extra. faster-whisper then runs on the CPU, and the model is
+downloaded from Hugging Face on first use (`base`, about 150 MB). With
+`TRANSCRIBER=auto`, the default, Azure is used when a key is set and the local model
+otherwise.
+
+```bash
+uv sync --extra local-asr && TRANSCRIBER=local uv run compliance-agent serve
+AGENT_EXTRAS=local-asr TRANSCRIBER=local docker compose up -d --build   # image +750 MB
+```
+
+| Transcriber | Per 10 s clip (after load) | Cost | Words on the 3 test clips | Video eval |
+| --- | --- | --- | --- | --- |
+| Azure AI Speech (F0) | network round trip | free tier; $1 per audio hour list | exact | 3/3 |
+| faster-whisper `base`, CPU, int8 | 0.4 s, plus a 5 s first load | $0 | one slip ("Brand X beer" → "brand expier") | 3/3 |
+
+`LOCAL_WHISPER_MODEL=small` or larger trades speed for accuracy. `SPEECH_LANGUAGE=auto`
+lets the local model detect the language.
 
 ### Chinese input and cross-language consistency
 

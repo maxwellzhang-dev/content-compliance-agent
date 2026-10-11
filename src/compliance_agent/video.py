@@ -38,6 +38,9 @@ class VideoEvidence:
 
 
 class Transcriber(Protocol):
+    name: str
+    usd_per_hour: float  # for the cost estimate; 0 for local models
+
     async def transcribe(self, wav_16k_mono: bytes) -> str: ...
 
 
@@ -105,6 +108,9 @@ def split_wav(wav_bytes: bytes, seconds: int = CHUNK_SECONDS) -> list[bytes]:
 class AzureSpeechTranscriber:
     """Azure AI Speech short-audio REST API, one request per 55-second chunk."""
 
+    name = "azure-speech"
+    usd_per_hour = 1.00  # standard list price; the F0 tier is free up to 5 h a month
+
     def __init__(self, key: str, region: str, language: str = "en-US") -> None:
         self.key, self.region, self.language = key, region, language
 
@@ -127,6 +133,90 @@ class AzureSpeechTranscriber:
                 if body.get("RecognitionStatus") == "Success" and body.get("DisplayText"):
                     parts.append(body["DisplayText"])
         return " ".join(parts)
+
+
+class LocalWhisperTranscriber:
+    """faster-whisper on the local CPU: no API key, nothing leaves the machine.
+
+    Install with `uv sync --extra local-asr`. The model (default `base`, ~150 MB) is
+    downloaded from Hugging Face on first use and cached. Transcription runs in a worker
+    thread so it does not block the event loop."""
+
+    usd_per_hour = 0.0
+
+    def __init__(
+        self,
+        model_size: str = "base",
+        language: str | None = "en",
+        device: str = "cpu",
+        compute_type: str = "int8",
+        model=None,  # injectable for tests
+    ) -> None:
+        self.model_size, self.language = model_size, language
+        self.device, self.compute_type = device, compute_type
+        self.name = f"local-whisper-{model_size}"
+        self._model = model
+
+    def _load(self):
+        if self._model is None:
+            from faster_whisper import WhisperModel
+
+            self._model = WhisperModel(
+                self.model_size, device=self.device, compute_type=self.compute_type
+            )
+        return self._model
+
+    def _run(self, wav_16k_mono: bytes) -> str:
+        import numpy as np
+
+        with wave.open(io.BytesIO(wav_16k_mono)) as w:
+            pcm = w.readframes(w.getnframes())
+        audio = np.frombuffer(pcm, dtype=np.int16).astype(np.float32) / 32768.0
+        segments, _info = self._load().transcribe(audio, language=self.language, beam_size=5)
+        return " ".join(seg.text.strip() for seg in segments).strip()
+
+    async def transcribe(self, wav_16k_mono: bytes) -> str:
+        import asyncio
+
+        return await asyncio.to_thread(self._run, wav_16k_mono)
+
+
+def local_whisper_available() -> bool:
+    try:
+        import faster_whisper  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+def make_transcriber(settings) -> Transcriber | None:
+    """Pick the transcriber from TRANSCRIBER: azure | local | none | auto (default).
+
+    auto uses Azure AI Speech when a key is configured, otherwise local faster-whisper
+    when it is installed, otherwise none (videos are then reviewed from frames only)."""
+    choice = settings.transcriber
+    has_azure = bool(settings.speech_key and settings.speech_region)
+    if choice == "auto":
+        choice = "azure" if has_azure else ("local" if local_whisper_available() else "none")
+    if choice == "azure":
+        if not has_azure:
+            raise ValueError("TRANSCRIBER=azure needs AZURE_SPEECH_KEY and AZURE_SPEECH_REGION")
+        return AzureSpeechTranscriber(
+            settings.speech_key, settings.speech_region, settings.speech_language
+        )
+    if choice == "local":
+        if not local_whisper_available():
+            raise ValueError("TRANSCRIBER=local needs faster-whisper: uv sync --extra local-asr")
+        lang = settings.speech_language
+        return LocalWhisperTranscriber(
+            model_size=settings.local_whisper_model,
+            language=None if lang == "auto" else lang.split("-")[0].lower(),
+        )
+    if choice == "none":
+        return None
+    raise ValueError(
+        f"unknown TRANSCRIBER {settings.transcriber!r}: use azure, local, none or auto"
+    )
 
 
 async def gather_evidence(path: Path | str, transcriber: Transcriber | None) -> VideoEvidence:

@@ -1,10 +1,14 @@
 # Agent API on :8000, Open WebUI on :3001. Credentials come from .env (see .env.example).
 services:
   agent:
-    build: .
+    build:
+      context: .
+      args:
+        EXTRAS: ${AGENT_EXTRAS:-}   # AGENT_EXTRAS=local-asr for local whisper transcription
     env_file: .env
     environment:
       AGENT_API_KEY: ${AGENT_API_KEY:-local-dev-key}
+      TRANSCRIBER: ${TRANSCRIBER:-auto}
     volumes:
       - ./rag_storage:/data/rag_storage
       - agent-data:/data/queue

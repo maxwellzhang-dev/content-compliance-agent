@@ -34,7 +34,9 @@ class Settings:
     api_key: str | None  # bearer token the agent's own API expects, if set
     speech_key: str | None
     speech_region: str | None
-    speech_language: str
+    speech_language: str  # e.g. en-US, zh-CN; "auto" lets local whisper detect it
+    transcriber: str  # azure | local | none | auto
+    local_whisper_model: str  # faster-whisper size: tiny, base, small, medium, ...
     allow_private_video_urls: bool
 
     @property
@@ -75,6 +77,8 @@ class Settings:
             speech_key=os.getenv("AZURE_SPEECH_KEY") or None,
             speech_region=os.getenv("AZURE_SPEECH_REGION") or None,
             speech_language=os.getenv("SPEECH_LANGUAGE", "en-US"),
+            transcriber=os.getenv("TRANSCRIBER", "auto").lower(),
+            local_whisper_model=os.getenv("LOCAL_WHISPER_MODEL", "base"),
             allow_private_video_urls=os.getenv("ALLOW_PRIVATE_VIDEO_URLS", "").lower()
             in {"1", "true", "yes"},
         )

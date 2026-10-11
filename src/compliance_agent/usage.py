@@ -51,6 +51,8 @@ class Usage(BaseModel):
     stages_ms: dict[str, float] = Field(default_factory=dict)
     tokens: dict[str, ModelTokens] = Field(default_factory=dict)
     audio_seconds: float = 0.0
+    audio_provider: str = ""  # which transcriber handled the audio
+    audio_usd_per_hour: float = SPEECH_USD_PER_HOUR
     estimated_usd: float = 0.0
 
     @property
@@ -95,7 +97,7 @@ class UsageMeter:
             p = price_for(model)
             fresh = max(t.prompt - t.cached, 0)
             usd += (fresh * p["in"] + t.cached * p["cached_in"] + t.completion * p["out"]) / 1e6
-        usd += u.audio_seconds / 3600 * SPEECH_USD_PER_HOUR
+        usd += u.audio_seconds / 3600 * u.audio_usd_per_hour
         u.estimated_usd = round(usd, 6)
         return u
 

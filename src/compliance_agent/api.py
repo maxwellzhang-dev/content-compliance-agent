@@ -39,7 +39,7 @@ from .render import render_markdown
 from .review_page import render_detail, render_queue, render_stats, render_submit
 from .schemas import Verdict
 from .store import ReviewStore, stats
-from .video import MAX_DOWNLOAD_BYTES, VIDEO_SUFFIXES, AzureSpeechTranscriber, download_video
+from .video import MAX_DOWNLOAD_BYTES, VIDEO_SUFFIXES, download_video, make_transcriber
 
 VIDEO_URL = re.compile(
     r"https?://\S+?(?:" + "|".join(re.escape(x) for x in VIDEO_SUFFIXES) + r")(?:\?\S*)?",
@@ -77,13 +77,7 @@ def build_agent(settings: Settings) -> ComplianceAgent:
 
         retriever = LightRAGRetriever(corpus, settings)
     judge = OpenAIJudge(make_async_client(settings), settings)
-    transcriber = (
-        AzureSpeechTranscriber(
-            settings.speech_key, settings.speech_region, settings.speech_language
-        )
-        if settings.speech_key and settings.speech_region
-        else None
-    )
+    transcriber = make_transcriber(settings)
     return ComplianceAgent(
         retriever, judge, settings, ReviewStore(settings.review_db_path), transcriber
     )

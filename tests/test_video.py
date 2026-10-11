@@ -125,3 +125,62 @@ def test_submit_page_redirects_to_the_review(retriever, settings):
                 follow_redirects=False,
             )
     assert r.status_code == 303 and r.headers["location"] == "/review/1"
+
+
+class FakeWhisperModel:
+    def __init__(self):
+        self.seen = None
+
+    def transcribe(self, audio, language=None, beam_size=5):
+        from types import SimpleNamespace
+
+        self.seen = (audio.dtype.name, len(audio), language)
+        segs = [SimpleNamespace(text=" Guaranteed returns"), SimpleNamespace(text=" every month. ")]
+        return iter(segs), None
+
+
+def test_local_whisper_feeds_float_audio_and_joins_segments():
+    model = FakeWhisperModel()
+    tx = v.LocalWhisperTranscriber(model=model, language="en")
+    text = asyncio.run(tx.transcribe(v.extract_audio(SAMPLE)))
+    assert text == "Guaranteed returns every month."
+    dtype, n, lang = model.seen
+    assert dtype == "float32" and 4 * 16_000 < n < 12 * 16_000 and lang == "en"
+    assert tx.usd_per_hour == 0
+
+
+def _settings(settings, **kw):
+    import dataclasses
+
+    base = {"speech_key": None, "speech_region": None, "transcriber": "auto"}
+    return dataclasses.replace(settings, **{**base, **kw})
+
+
+def test_transcriber_selection(settings, monkeypatch):
+    s = _settings(settings, speech_key="k", speech_region="koreacentral")
+    assert isinstance(v.make_transcriber(s), v.AzureSpeechTranscriber)
+    monkeypatch.setattr(v, "local_whisper_available", lambda: True)
+    local = v.make_transcriber(_settings(settings, speech_language="zh-CN"))
+    assert isinstance(local, v.LocalWhisperTranscriber) and local.language == "zh"
+    auto_lang = v.make_transcriber(_settings(settings, speech_language="auto"))
+    assert auto_lang.language is None
+    monkeypatch.setattr(v, "local_whisper_available", lambda: False)
+    assert v.make_transcriber(_settings(settings)) is None
+    assert v.make_transcriber(_settings(settings, transcriber="none")) is None
+
+
+@pytest.mark.parametrize(
+    "kw", [{"transcriber": "azure"}, {"transcriber": "local"}, {"transcriber": "bogus"}]
+)
+def test_transcriber_misconfiguration_fails_loudly(settings, monkeypatch, kw):
+    monkeypatch.setattr(v, "local_whisper_available", lambda: False)
+    with pytest.raises(ValueError):
+        v.make_transcriber(_settings(settings, **kw))
+
+
+def test_local_transcription_costs_nothing(retriever, settings):
+    tx = v.LocalWhisperTranscriber(model=FakeWhisperModel())
+    agent = ComplianceAgent(retriever, FakeJudge(), settings, transcriber=tx)
+    review = asyncio.run(agent.review("", video=SAMPLE))
+    assert review.usage.audio_provider == "local-whisper-base"
+    assert review.usage.audio_usd_per_hour == 0

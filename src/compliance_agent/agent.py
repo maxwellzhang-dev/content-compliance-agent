@@ -54,7 +54,12 @@ class ComplianceAgent:
             with usage.stage("video"):
                 evidence = await gather_evidence(video, self.transcriber)
             case.images, case.transcript, case.is_video = evidence.frames, evidence.transcript, True
-            usage.current().usage.audio_seconds = round(evidence.audio_seconds, 2)
+            meter = usage.current().usage
+            meter.audio_seconds = round(evidence.audio_seconds, 2)
+            if self.transcriber is not None:
+                tx = self.transcriber
+                meter.audio_provider = getattr(tx, "name", type(tx).__name__)
+                meter.audio_usd_per_hour = getattr(tx, "usd_per_hour", 0.0)
         if case.images:
             with usage.stage("observe"):
                 case.observation = await self.judge.observe(case)

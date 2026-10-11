@@ -1,0 +1,68 @@
+{
+  "summary": {
+    "cases": 3,
+    "retrieval_recall_at_k": 1.0,
+    "verdict_accuracy": 1.0,
+    "auto_routed": 2,
+    "auto_accuracy": 1.0,
+    "escalation_rate": 0.333,
+    "wrong_verdicts": 0,
+    "wrong_caught_by_router": 0,
+    "hard_cases_escalated": 0,
+    "hard_cases": 0,
+    "errors": 0,
+    "mean_latency_s": 13.063,
+    "mean_cost_usd": 0.00572,
+    "multimodal_accuracy": 1.0
+  },
+  "cases": [
+    {
+      "id": "v01",
+      "expected": "not_allowed",
+      "got": "not_allowed",
+      "route": "human_review",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": true,
+      "error": null,
+      "verdict_probability": 1.0,
+      "agreement": 1.0,
+      "groundedness": 0.6667,
+      "hard_fail": false,
+      "latency_s": 12.38,
+      "cost_usd": 0.005492
+    },
+    {
+      "id": "v02",
+      "expected": "not_allowed",
+      "got": "not_allowed",
+      "route": "auto",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": true,
+      "error": null,
+      "verdict_probability": 1.0,
+      "agreement": 1.0,
+      "groundedness": 1.0,
+      "hard_fail": false,
+      "latency_s": 15.15,
+      "cost_usd": 0.005975
+    },
+    {
+      "id": "v03",
+      "expected": "allowed",
+      "got": "allowed",
+      "route": "auto",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": true,
+      "error": null,
+      "verdict_probability": 0.9999,
+      "agreement": 1.0,
+      "groundedness": 1.0,
+      "hard_fail": false,
+      "latency_s": 11.66,
+      "cost_usd": 0.00568
+    }
+  ]
+}
