@@ -143,3 +143,35 @@ def _row(row: sqlite3.Row) -> dict:
     d["images"] = json.loads(d["images"])
     d["reviewer_clauses"] = json.loads(d["reviewer_clauses"] or "[]")
     return d
+
+
+def _percentile(xs: list[float], q: float) -> float:
+    xs = sorted(xs)
+    return xs[min(len(xs) - 1, int(round(q * (len(xs) - 1))))]
+
+
+def stats(store: ReviewStore, limit: int = 1000) -> dict:
+    """Cost, latency and routing over the most recent reviews, overall and by media."""
+    records = store.list(None, limit)
+
+    def summarise(recs: list[dict]) -> dict:
+        used = [r["review"]["usage"] for r in recs if r["review"].get("usage")]
+        ms = [u["total_ms"] for u in used]
+        usd = [u["estimated_usd"] for u in used]
+        return {
+            "reviews": len(recs),
+            "metered": len(used),  # reviews with usage data; latency and cost cover only these
+            "escalated": sum(r["route"] != "auto" for r in recs),
+            "latency_p50_s": round(_percentile(ms, 0.5) / 1000, 2) if ms else None,
+            "latency_p95_s": round(_percentile(ms, 0.95) / 1000, 2) if ms else None,
+            "mean_cost_usd": round(sum(usd) / len(usd), 5) if usd else None,
+            "total_cost_usd": round(sum(usd), 4),
+        }
+
+    by_media: dict[str, list[dict]] = {}
+    for r in records:
+        by_media.setdefault(r["review"].get("media", "text"), []).append(r)
+    return {
+        "overall": summarise(records),
+        "by_media": {m: summarise(rs) for m, rs in sorted(by_media.items())},
+    }

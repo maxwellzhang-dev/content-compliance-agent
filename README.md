@@ -87,6 +87,7 @@ the first signal shows as n/a and routing uses the other two. It is never estima
 | Video input: evenly sampled frames + Azure AI Speech transcript of the audio; upload at `/submit`, `POST /api/review-video`, or a video URL pasted into chat (public hosts only, 50 MB cap) | Implemented, verified live |
 | Chinese input: language detection, English translation for retrieval, original kept for the judge, rationale and UI labels in Chinese | Implemented, verified live |
 | Every review stored in SQLite, with its route, image and signals | Implemented |
+| Cost and latency per review: stage timings, tokens per model (LightRAG's own calls included), audio seconds, estimated USD; shown under each answer and aggregated at `/stats` | Implemented, verified live |
 | Review queue page at `/review`: approve, or override with the correct verdict, deciding clauses and a note | Implemented, verified live |
 | Report an auto-decided review as wrong (`POST /api/reviews/{id}/flag`), pulling it into the queue | Implemented |
 | "Report wrong verdict" button under every answer in Open WebUI (an Action function): asks for a reason, then flags the review | Implemented, verified live; `python openwebui/install_actions.py` |
@@ -182,6 +183,23 @@ Chinese run was right and the English run wrong. On a like-for-like broadband
 comparison (h23) it was the reverse. With one run per language that looks like sampling
 noise, not a language gap, but two runs cannot prove it.
 
+### Cost and latency
+
+Each review is metered: time per stage, tokens per model, including LightRAG's own
+keyword-extraction and embedding calls, and audio seconds. Cost is estimated at list
+prices (`src/compliance_agent/usage.py`, overridable with `PRICE_*` env vars). It is not
+an Azure bill. One live review of each kind:
+
+| Input | Latency | Tokens | Est. cost | Largest stage |
+| --- | --- | --- | --- | --- |
+| Text | 6.5 s | 3.1k | $0.0019 | LightRAG retrieval, 3.4 s |
+| Image | 11.1 s | 8.3k | $0.0043 | decision + samples, 2.9 s |
+| Video (10 s, 6 s of speech) | 14.2 s | 12.1k | $0.0072 | decision + samples, 3.7 s |
+
+For text, retrieval takes longer than the decision, and most of it is LightRAG's
+keyword-extraction call. That is the first thing to optimise. Repeated queries hit
+LightRAG's cache, which costs nothing.
+
 ### Threshold calibration, and why the defaults stayed
 
 `compliance-agent calibrate` re-routes recorded cases under every combination of
@@ -255,6 +273,7 @@ src/compliance_agent/
   retrieval.py              offline hybrid retriever (tests/CI), shared result type
   judge.py                  decision, sampling and grounding calls; logprob extraction
   video.py                  frame sampling, audio extraction, Azure Speech, safe download
+  usage.py                  per-review metering: stage timings, tokens, estimated cost
   confidence.py             the three signals and the routing rule
   agent.py                  the pipeline
   store.py                  SQLite store of every review; flag / resolve

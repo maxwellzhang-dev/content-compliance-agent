@@ -46,7 +46,12 @@ class FakeJudge:
         )
 
     async def decide(self, case, retrieval):
+        from compliance_agent import usage
+
         self.decided = case
+        meter = usage.current()
+        if meter is not None:
+            meter.add("gpt-4.1-mini", prompt=2000, completion=150, cached=1000)
         return self._decision(retrieval, self.verdict), self.prob
 
     async def sample(self, case, retrieval, n):

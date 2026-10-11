@@ -7,6 +7,7 @@ import asyncio
 from pathlib import Path
 
 from . import confidence as conf
+from . import usage
 from .config import Settings
 from .judge import Case, Judge, detect_language
 from .schemas import Confidence, Review
@@ -32,21 +33,37 @@ class ComplianceAgent:
     async def review(
         self, scenario: str, images: list[str] | None = None, video: str | Path | None = None
     ) -> Review:
+        with usage.metered() as meter:
+            review, shown = await self._review(scenario, images, video)
+            review.usage = meter.finish()
+        if self.store is not None:
+            review.id = self.store.add(review, shown)
+        return review
+
+    async def _review(self, scenario, images, video) -> tuple[Review, list[str]]:
+        """Returns the review and the images it was judged on (video frames included)."""
         case = Case(text=scenario or "Review the attached content.", images=list(images or []))
         case.language = detect_language(case.text)
         if case.language != "en":
-            case.english_text = await self.judge.to_english(case.text)
+            with usage.stage("translate"):
+                case.english_text = await self.judge.to_english(case.text)
         if video is not None:
-            evidence = await gather_evidence(video, self.transcriber)
+            with usage.stage("video"):
+                evidence = await gather_evidence(video, self.transcriber)
             case.images, case.transcript, case.is_video = evidence.frames, evidence.transcript, True
+            usage.current().usage.audio_seconds = round(evidence.audio_seconds, 2)
         if case.images:
-            case.observation = await self.judge.observe(case)
-        retrieval = await self.retriever.retrieve(case.query_text())
-        (decision, prob), samples = await asyncio.gather(
-            self.judge.decide(case, retrieval),
-            self.judge.sample(case, retrieval, max(self.settings.samples - 1, 0)),
-        )
-        claims = await self.judge.ground(decision, retrieval)
+            with usage.stage("observe"):
+                case.observation = await self.judge.observe(case)
+        with usage.stage("retrieve"):
+            retrieval = await self.retriever.retrieve(case.query_text())
+        with usage.stage("decide"):
+            (decision, prob), samples = await asyncio.gather(
+                self.judge.decide(case, retrieval),
+                self.judge.sample(case, retrieval, max(self.settings.samples - 1, 0)),
+            )
+        with usage.stage("ground"):
+            claims = await self.judge.ground(decision, retrieval)
 
         retrieved_ids = {c.id for c in retrieval.clauses}
         verdicts = [decision.verdict] + [s.verdict for s in samples]
@@ -78,6 +95,4 @@ class ComplianceAgent:
             route_reasons=reasons,
             concepts=retrieval.keywords,
         )
-        if self.store is not None:
-            review.id = self.store.add(review, case.images)
-        return review
+        return review, case.images

@@ -34,6 +34,7 @@ class VideoEvidence:
     frames: list[str]  # data: URLs, in time order
     transcript: str | None  # None when the video has no audio track
     duration: float
+    audio_seconds: float = 0.0  # length of audio sent for transcription
 
 
 class Transcriber(Protocol):
@@ -133,10 +134,14 @@ async def gather_evidence(path: Path | str, transcriber: Transcriber | None) -> 
     if not frames:
         raise ValueError("no frames could be decoded from the video")
     audio = extract_audio(path)
-    transcript = None
+    transcript, audio_seconds = None, 0.0
     if audio is not None and transcriber is not None:
         transcript = (await transcriber.transcribe(audio)).strip()
-    return VideoEvidence(frames=frames, transcript=transcript, duration=duration)
+        with wave.open(io.BytesIO(audio)) as w:
+            audio_seconds = w.getnframes() / w.getframerate()
+    return VideoEvidence(
+        frames=frames, transcript=transcript, duration=duration, audio_seconds=audio_seconds
+    )
 
 
 def _public_host(host: str) -> bool:

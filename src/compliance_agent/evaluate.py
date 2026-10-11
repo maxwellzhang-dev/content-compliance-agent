@@ -36,6 +36,8 @@ class CaseResult:
     agreement: float | None = None
     groundedness: float | None = None
     hard_fail: bool = False  # escalated whatever the thresholds (stray citation, nothing found)
+    latency_s: float | None = None
+    cost_usd: float | None = None
 
     @property
     def correct(self) -> bool:
@@ -70,6 +72,8 @@ def score_case(case: dict, review: Review) -> CaseResult:
         verdict_probability=review.confidence.verdict_probability,
         agreement=review.confidence.agreement,
         groundedness=review.confidence.groundedness,
+        latency_s=round(review.usage.total_ms / 1000, 2) if review.usage else None,
+        cost_usd=review.usage.estimated_usd if review.usage else None,
         hard_fail=any(
             r.startswith(("cites clauses", "no policy clause")) for r in review.route_reasons
         ),
@@ -93,8 +97,14 @@ def summarise(results: list[CaseResult]) -> dict:
         "hard_cases_escalated": sum(1 for r in escalated if r.hard),
         "hard_cases": sum(r.hard for r in results),
         "errors": sum(1 for r in results if r.error),
+        "mean_latency_s": _mean([r.latency_s for r in results if r.latency_s is not None]),
+        "mean_cost_usd": _mean_fine([r.cost_usd for r in results if r.cost_usd is not None]),
         "multimodal_accuracy": _accuracy([r for r in results if r.multimodal]),
     }
+
+
+def _mean_fine(xs: list[float]) -> float | None:
+    return round(sum(xs) / len(xs), 5) if xs else None
 
 
 def _mean(xs: list[float]) -> float | None:

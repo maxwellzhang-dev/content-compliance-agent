@@ -57,7 +57,11 @@ background:var(--bg);border-radius:0 6px 6px 0}
 .upload{display:grid;gap:12px;background:var(--card);border:1px solid var(--line);
 border-radius:10px;padding:18px}.upload textarea{font:inherit;padding:8px;border-radius:6px;
 border:1px solid var(--line);background:var(--field);color:var(--ink);min-height:70px}
-.links{font-size:14px;margin-bottom:14px}.links a{color:var(--accent)}.empty{color:var(--muted);text-align:center;padding:48px 0}
+.links{font-size:14px;margin-bottom:14px}
+table.stats{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);
+border-radius:10px;overflow:hidden;font-size:14px}table.stats th,table.stats td{padding:10px 12px;
+text-align:right;border-bottom:1px solid var(--line)}table.stats th:first-child,
+table.stats td:first-child{text-align:left}table.stats th{color:var(--muted);font-weight:600}.links a{color:var(--accent)}.empty{color:var(--muted);text-align:center;padding:48px 0}
 @media (max-width:600px){.card.has-img{grid-template-columns:1fr}.card img{width:100%;
 grid-row:auto}}
 """
@@ -179,6 +183,30 @@ audio is transcribed; both are reviewed against the policy.</p>
 <span class="meta">A video takes 20–60 seconds.</span></div>
 </form>"""
     return _page("Submit Content", body)
+
+
+def render_stats(data: dict) -> str:
+    def cell(v, fmt):
+        return "–" if v is None else fmt.format(v)
+
+    rows = [("All", data["overall"])] + [(m.title(), d) for m, d in data["by_media"].items()]
+    body_rows = "".join(
+        f"<tr><td>{escape(name)}</td><td>{d['reviews']}</td><td>{d['metered']}</td>"
+        f"<td>{cell(d['escalated'] / d['reviews'] if d['reviews'] else None, '{:.0%}')}</td>"
+        f"<td>{cell(d['latency_p50_s'], '{:.1f} s')}</td><td>{cell(d['latency_p95_s'], '{:.1f} s')}</td>"
+        f"<td>{cell(d['mean_cost_usd'], '${:.4f}')}</td><td>${d['total_cost_usd']:.4f}</td></tr>"
+        for name, d in rows
+    )
+    body = f"""<p class="links"><a href="/review">← Review queue</a></p>
+<h1>Cost and latency</h1>
+<p class="sub">Over the most recent stored reviews. Cost is estimated at list prices
+(tokens per model, audio per hour); it is not an Azure bill. Latency and cost cover
+metered reviews only; reviews stored before metering was added have no usage data.
+"Escalated" counts the router's decisions, not reviews reported later.</p>
+<table class="stats"><thead><tr><th>Media</th><th>Reviews</th><th>Metered</th><th>Escalated</th>
+<th>Latency p50</th><th>Latency p95</th><th>Mean cost</th><th>Total</th></tr></thead>
+<tbody>{body_rows}</tbody></table>"""
+    return _page("Cost and Latency", body)
 
 
 def render_queue(records: list[dict], tab: str, counts: dict[str, int]) -> str:

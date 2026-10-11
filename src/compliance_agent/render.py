@@ -44,6 +44,22 @@ TEXT = {
         "keywords": "Query keywords",
         "review": "Review",
         "in_queue": "in the [review queue]({url})",
+        "cost": "Cost and latency",
+        "stage": "Stage",
+        "time": "Time",
+        "model": "Model",
+        "calls": "Calls",
+        "tokens": "Tokens in / out",
+        "estimate": "Estimated cost at list prices; not an Azure bill.",
+        "audio": "Audio transcribed",
+        "stages": {
+            "translate": "Translate",
+            "video": "Frames + transcription",
+            "observe": "Vision pass",
+            "retrieve": "LightRAG retrieval",
+            "decide": "Decision + samples",
+            "ground": "Groundedness check",
+        },
     },
     "zh": {
         Verdict.ALLOWED: "✅ 可以播出",
@@ -78,6 +94,22 @@ TEXT = {
         "keywords": "检索关键词",
         "review": "审核记录",
         "in_queue": "见[复核队列]({url})",
+        "cost": "成本与耗时",
+        "stage": "阶段",
+        "time": "耗时",
+        "model": "模型",
+        "calls": "调用次数",
+        "tokens": "输入 / 输出 tokens",
+        "estimate": "按列表价估算，不是 Azure 账单。",
+        "audio": "转写音频",
+        "stages": {
+            "translate": "翻译",
+            "video": "抽帧 + 转写",
+            "observe": "视觉理解",
+            "retrieve": "LightRAG 检索",
+            "decide": "判定 + 采样",
+            "ground": "groundedness 检查",
+        },
     },
 }
 
@@ -99,6 +131,34 @@ def _reason(reason: str, lang: str) -> str:
         if pattern.search(reason):
             return pattern.sub(repl, reason)
     return reason
+
+
+def _usage_summary(review: Review) -> str:
+    u = review.usage
+    if u is None:
+        return ""
+    return f" · {u.total_ms / 1000:.1f} s · {_k(u.total_tokens)} tokens · ≈ ${u.estimated_usd:.4f}"
+
+
+def _k(n: int) -> str:
+    return f"{n / 1000:.1f}k" if n >= 1000 else str(n)
+
+
+def _usage_block(u, t) -> list[str]:
+    lines = [
+        "<details>",
+        f"<summary>{t['cost']}</summary>",
+        "",
+        f"| {t['stage']} | {t['time']} |",
+        "| --- | --- |",
+    ]
+    lines += [f"| {t['stages'].get(k, k)} | {v / 1000:.2f} s |" for k, v in u.stages_ms.items()]
+    lines += ["", f"| {t['model']} | {t['calls']} | {t['tokens']} |", "| --- | --- | --- |"]
+    lines += [f"| {m} | {x.calls} | {x.prompt:,} / {x.completion:,} |" for m, x in u.tokens.items()]
+    if u.audio_seconds:
+        lines += ["", f"{t['audio']}: {u.audio_seconds:.1f} s"]
+    lines += ["", f"≈ ${u.estimated_usd:.4f} · {t['estimate']}", "", "</details>"]
+    return lines
 
 
 def _clip(text: str, limit: int = 500) -> str:
@@ -180,11 +240,13 @@ def render_markdown(review: Review, queue_url: str | None = None) -> str:
     if review.concepts:
         lines += ["", f"{t['keywords']}: {', '.join(review.concepts)}"]
     lines += ["", "</details>"]
+    if review.usage is not None:
+        lines += ["", *_usage_block(review.usage, t)]
     if review.id is not None:
         where = (
             f" · {t['in_queue'].format(url=queue_url)}"
             if queue_url and review.route != "auto"
             else ""
         )
-        lines += ["", f"*{t['review']} #{review.id}{where}*"]
+        lines += ["", f"*{t['review']} #{review.id}{_usage_summary(review)}{where}*"]
     return "\n".join(lines)

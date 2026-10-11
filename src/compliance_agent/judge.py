@@ -10,6 +10,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Protocol
 
+from . import usage
 from .config import Settings
 from .retrieval import RetrievalResult
 from .schemas import ClaimCheck, Decision, GroundingReport, MediaObservation
@@ -181,9 +182,16 @@ class OpenAIJudge:
         ]
 
     async def _parse(self, messages, schema, **extra):
-        return await self.client.chat.completions.parse(
+        resp = await self.client.chat.completions.parse(
             model=self.settings.judge_model, messages=messages, response_format=schema, **extra
         )
+        self._charge(resp)
+        return resp
+
+    def _charge(self, resp) -> None:
+        meter = usage.current()
+        if meter is not None:
+            meter.add_response(self.settings.judge_model, resp)
 
     async def to_english(self, text):
         extra = {} if self.settings.judge_is_reasoning else {"temperature": 0}
@@ -195,6 +203,7 @@ class OpenAIJudge:
             ],
             **extra,
         )
+        self._charge(resp)
         return (resp.choices[0].message.content or "").strip()
 
     async def observe(self, case):

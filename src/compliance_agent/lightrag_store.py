@@ -10,6 +10,7 @@ judge so we control the output schema and get token logprobs.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import re
 from functools import partial
@@ -23,6 +24,8 @@ from .config import Settings
 from .policies import PolicyCorpus
 from .retrieval import RetrievalResult
 from .schemas import RetrievedClause
+from .usage import LightRAGTracker, UsageMeter
+from .usage import current as current_meter
 
 _CLAUSE_FILE = re.compile(r"([A-Z]{2,3}-\d+)\.md")
 
@@ -39,6 +42,10 @@ class LightRAGRetriever:
         self.top_k = top_k
         Path(settings.rag_dir).mkdir(parents=True, exist_ok=True)
 
+        self._sink: UsageMeter | None = None  # meter charged for LightRAG's own calls
+        self._lock: asyncio.Lock | None = None
+        llm_tracker = LightRAGTracker(settings.index_model, lambda: self._sink)
+        embed_tracker = LightRAGTracker(settings.embedding_model, lambda: self._sink)
         azure = settings.provider == "azure"
         conn = (
             {
@@ -59,7 +66,7 @@ class LightRAGRetriever:
                 history_messages=history_messages or [],
                 **({"azure_deployment": settings.index_model} if azure else {}),
                 **conn,
-                **kwargs,
+                **{**kwargs, "token_tracker": llm_tracker},
             )
 
         embed = EmbeddingFunc(
@@ -69,6 +76,7 @@ class LightRAGRetriever:
             func=partial(
                 openai_embed.func,
                 model=settings.embedding_model,
+                token_tracker=embed_tracker,
                 **({"azure_deployment": settings.embedding_model} if azure else {}),
                 **conn,
             ),
@@ -108,9 +116,16 @@ class LightRAGRetriever:
 
     async def retrieve(self, scenario: str) -> RetrievalResult:
         await self.start()
-        result = await self.rag.aquery_data(
-            scenario, QueryParam(mode="mix", top_k=20, chunk_top_k=8, enable_rerank=False)
-        )
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        async with self._lock:  # one retrieval at a time, so its tokens go to one meter
+            self._sink = current_meter()
+            try:
+                result = await self.rag.aquery_data(
+                    scenario, QueryParam(mode="mix", top_k=20, chunk_top_k=8, enable_rerank=False)
+                )
+            finally:
+                self._sink = None
         data = result.get("data") or {}
         ranked: dict[str, tuple[float, set[str]]] = {}
 

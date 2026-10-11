@@ -8,6 +8,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from .usage import Usage
+
 
 class Verdict(StrEnum):
     ALLOWED = "allowed"
@@ -90,3 +92,4 @@ class Review(BaseModel):
     route: str  # "auto" or "human_review"
     route_reasons: list[str]
     concepts: list[str] = Field(default_factory=list, description="retriever keywords")
+    usage: Usage | None = None  # tokens, stage timings and estimated cost

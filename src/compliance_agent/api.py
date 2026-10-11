@@ -8,6 +8,7 @@
 * `/api/review-video` reviews an uploaded video (frames + transcribed audio); a video
   URL pasted into chat is fetched and reviewed the same way.
 * `/submit` is an upload page for an image or video, for clients that cannot attach one.
+* `/stats` (and `/api/stats`) shows latency percentiles and estimated cost.
 * `/review` is the queue as a page with approve / override forms. It has no login and is
   meant for local use (docker compose binds it to 127.0.0.1).
 """
@@ -35,9 +36,9 @@ from .config import Settings, make_async_client
 from .judge import OpenAIJudge
 from .policies import load_corpus
 from .render import render_markdown
-from .review_page import render_detail, render_queue, render_submit
+from .review_page import render_detail, render_queue, render_stats, render_submit
 from .schemas import Verdict
-from .store import ReviewStore
+from .store import ReviewStore, stats
 from .video import MAX_DOWNLOAD_BYTES, VIDEO_SUFFIXES, AzureSpeechTranscriber, download_video
 
 VIDEO_URL = re.compile(
@@ -244,6 +245,14 @@ def create_app(agent: ComplianceAgent | None = None, settings: Settings | None =
     @app.post("/api/reviews/{review_id}/resolve", dependencies=[Depends(auth)])
     async def resolve_review(review_id: int, req: ResolveRequest, request: Request):
         return _resolve(store(request), review_id, req)
+
+    @app.get("/api/stats", dependencies=[Depends(auth)])
+    async def api_stats(request: Request, limit: int = 1000):
+        return stats(store(request), limit)
+
+    @app.get("/stats", response_class=HTMLResponse)
+    async def stats_page(request: Request, limit: int = 1000):
+        return render_stats(stats(store(request), limit))
 
     @app.get("/review", response_class=HTMLResponse)
     async def review_page(request: Request, tab: str = "pending", limit: int = 50):
