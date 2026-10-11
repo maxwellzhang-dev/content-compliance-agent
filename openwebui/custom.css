@@ -1,0 +1,96 @@
+/* Compliance Desk theme for Open WebUI. Loaded from /static/custom.css.
+   Scoped to the assistant's markdown so Open WebUI's own chrome is left alone. */
+
+:root {
+  --cd-accent: #0f6b5c;
+  --cd-accent-soft: #e6f2ef;
+  --cd-line: #e3e6ea;
+  --cd-muted: #5d6672;
+  --cd-card: #fafbfc;
+}
+html.dark {
+  --cd-accent: #3cc6a8;
+  --cd-accent-soft: #12332d;
+  --cd-line: #2a2f37;
+  --cd-muted: #9aa3ad;
+  --cd-card: #171a20;
+}
+
+/* Verdict line */
+#response-content-container .markdown-prose h3:first-child {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin: 0.1rem 0 0.4rem;
+  letter-spacing: -0.01em;
+}
+
+/* Route line */
+#response-content-container .markdown-prose h3:first-child + p {
+  display: inline-block;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  background: var(--cd-accent-soft);
+  color: var(--cd-accent);
+  font-size: 0.85rem;
+  margin: 0 0 0.6rem;
+}
+#response-content-container .markdown-prose h3:first-child + p strong {
+  display: inline;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: inherit;
+  margin: 0;
+  color: inherit;
+}
+/* Escalated reviews are followed by their list of reasons: show them in amber */
+#response-content-container .markdown-prose h3:first-child + p:has(+ ul) {
+  background: #fdf1e0;
+  color: #8a4b00;
+}
+html.dark #response-content-container .markdown-prose h3:first-child + p:has(+ ul) {
+  background: #3a2a12;
+  color: #f0a43a;
+}
+
+/* Cited clauses as policy cards rather than italic quotes */
+#response-content-container .markdown-prose blockquote {
+  font-style: normal;
+  border-left: 3px solid var(--cd-accent);
+  background: var(--cd-card);
+  border-radius: 0 8px 8px 0;
+  padding: 0.6rem 0.9rem;
+  margin: 0.4rem 0 0.8rem;
+  color: inherit;
+}
+#response-content-container .markdown-prose blockquote p::before,
+#response-content-container .markdown-prose blockquote p::after {
+  content: none;
+}
+#response-content-container .markdown-prose blockquote strong {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  color: var(--cd-accent);
+  margin-right: 0.35rem;
+}
+
+/* Section labels */
+#response-content-container .markdown-prose p > strong:only-child {
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.72rem;
+  color: var(--cd-muted);
+  margin-top: 0.6rem;
+}
+
+/* Signal and retrieval tables */
+#response-content-container .markdown-prose table {
+  font-size: 0.85rem;
+  border: 1px solid var(--cd-line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+#response-content-container .markdown-prose th {
+  background: var(--cd-card);
+  font-weight: 600;
+}

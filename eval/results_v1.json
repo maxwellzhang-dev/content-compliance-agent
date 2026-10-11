@@ -1,0 +1,318 @@
+{
+  "summary": {
+    "cases": 30,
+    "retrieval_recall_at_k": 1.0,
+    "verdict_accuracy": 0.867,
+    "auto_routed": 24,
+    "auto_accuracy": 0.875,
+    "escalation_rate": 0.2,
+    "wrong_verdicts": 4,
+    "wrong_caught_by_router": 1,
+    "hard_cases_escalated": 2,
+    "hard_cases": 3,
+    "errors": 0,
+    "multimodal_accuracy": 0.833
+  },
+  "cases": [
+    {
+      "id": "s01",
+      "expected": "conditional",
+      "got": "conditional",
+      "route": "auto",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": false,
+      "error": null
+    },
+    {
+      "id": "s02",
+      "expected": "not_allowed",
+      "got": "not_allowed",
+      "route": "auto",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": false,
+      "error": null
+    },
+    {
+      "id": "s03",
+      "expected": "not_allowed",
+      "got": "not_allowed",
+      "route": "auto",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": false,
+      "error": null
+    },
+    {
+      "id": "s04",
+      "expected": "allowed",
+      "got": "allowed",
+      "route": "auto",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": false,
+      "error": null
+    },
+    {
+      "id": "s05",
+      "expected": "not_allowed",
+      "got": "not_allowed",
+      "route": "auto",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": false,
+      "error": null
+    },
+    {
+      "id": "s06",
+      "expected": "not_allowed",
+      "got": "not_allowed",
+      "route": "auto",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": false,
+      "error": null
+    },
+    {
+      "id": "s07",
+      "expected": "not_allowed",
+      "got": "not_allowed",
+      "route": "auto",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": false,
+      "error": null
+    },
+    {
+      "id": "s08",
+      "expected": "not_allowed",
+      "got": "not_allowed",
+      "route": "human_review",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": false,
+      "error": null
+    },
+    {
+      "id": "s09",
+      "expected": "not_allowed",
+      "got": "not_allowed",
+      "route": "auto",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": false,
+      "error": null
+    },
+    {
+      "id": "s10",
+      "expected": "not_allowed",
+      "got": "not_allowed",
+      "route": "auto",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": false,
+      "error": null
+    },
+    {
+      "id": "s11",
+      "expected": "allowed",
+      "got": "allowed",
+      "route": "auto",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": false,
+      "error": null
+    },
+    {
+      "id": "s12",
+      "expected": "not_allowed",
+      "got": "not_allowed",
+      "route": "auto",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": false,
+      "error": null
+    },
+    {
+      "id": "s13",
+      "expected": "allowed",
+      "got": "allowed",
+      "route": "auto",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": false,
+      "error": null
+    },
+    {
+      "id": "s14",
+      "expected": "conditional",
+      "got": "conditional",
+      "route": "human_review",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": false,
+      "error": null
+    },
+    {
+      "id": "s15",
+      "expected": "not_allowed",
+      "got": "not_allowed",
+      "route": "human_review",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": false,
+      "error": null
+    },
+    {
+      "id": "s16",
+      "expected": "conditional",
+      "got": "not_allowed",
+      "route": "auto",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": false,
+      "error": null
+    },
+    {
+      "id": "s17",
+      "expected": "conditional",
+      "got": "not_allowed",
+      "route": "human_review",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": false,
+      "error": null
+    },
+    {
+      "id": "s18",
+      "expected": "allowed",
+      "got": "allowed",
+      "route": "human_review",
+      "recall": 1.0,
+      "hard": true,
+      "multimodal": false,
+      "error": null
+    },
+    {
+      "id": "s19",
+      "expected": "conditional",
+      "got": "not_allowed",
+      "route": "auto",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": false,
+      "error": null
+    },
+    {
+      "id": "s20",
+      "expected": "not_allowed",
+      "got": "not_allowed",
+      "route": "auto",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": false,
+      "error": null
+    },
+    {
+      "id": "s21",
+      "expected": "not_allowed",
+      "got": "not_allowed",
+      "route": "auto",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": false,
+      "error": null
+    },
+    {
+      "id": "s22",
+      "expected": "allowed",
+      "got": "allowed",
+      "route": "human_review",
+      "recall": 1.0,
+      "hard": true,
+      "multimodal": false,
+      "error": null
+    },
+    {
+      "id": "s23",
+      "expected": "not_allowed",
+      "got": "not_allowed",
+      "route": "auto",
+      "recall": 1.0,
+      "hard": true,
+      "multimodal": false,
+      "error": null
+    },
+    {
+      "id": "s24",
+      "expected": "not_allowed",
+      "got": "not_allowed",
+      "route": "auto",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": false,
+      "error": null
+    },
+    {
+      "id": "m01",
+      "expected": "not_allowed",
+      "got": "not_allowed",
+      "route": "auto",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": true,
+      "error": null
+    },
+    {
+      "id": "m02",
+      "expected": "not_allowed",
+      "got": "not_allowed",
+      "route": "auto",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": true,
+      "error": null
+    },
+    {
+      "id": "m03",
+      "expected": "allowed",
+      "got": "conditional",
+      "route": "auto",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": true,
+      "error": null
+    },
+    {
+      "id": "m04",
+      "expected": "not_allowed",
+      "got": "not_allowed",
+      "route": "auto",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": true,
+      "error": null
+    },
+    {
+      "id": "m05",
+      "expected": "allowed",
+      "got": "allowed",
+      "route": "auto",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": true,
+      "error": null
+    },
+    {
+      "id": "m06",
+      "expected": "conditional",
+      "got": "conditional",
+      "route": "auto",
+      "recall": 1.0,
+      "hard": false,
+      "multimodal": true,
+      "error": null
+    }
+  ]
+}

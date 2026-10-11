@@ -1,0 +1,8 @@
+.venv
+.env
+rag_storage
+review_queue.jsonl
+.git
+.pytest_cache
+.ruff_cache
+**/__pycache__

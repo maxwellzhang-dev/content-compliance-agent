@@ -1,0 +1,59 @@
+# Agent API on :8000, Open WebUI on :3001. Credentials come from .env (see .env.example).
+services:
+  agent:
+    build: .
+    env_file: .env
+    environment:
+      AGENT_API_KEY: ${AGENT_API_KEY:-local-dev-key}
+    volumes:
+      - ./rag_storage:/data/rag_storage
+      - agent-data:/data/queue
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 10s
+      retries: 5
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:v0.11.4
+    depends_on:
+      agent:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${WEBUI_PORT:-3001}:8080"
+    volumes:
+      - open-webui:/app/backend/data
+      - ./openwebui/custom.css:/app/build/static/custom.css:ro
+    environment:
+      WEBUI_NAME: Compliance Desk
+      WEBUI_AUTH: "False"                 # single-user local prototype
+      ENABLE_OLLAMA_API: "False"
+      OPENAI_API_BASE_URL: http://agent:8000/v1
+      OPENAI_API_KEY: ${AGENT_API_KEY:-local-dev-key}
+      DEFAULT_MODELS: compliance-agent
+      # Open WebUI sends its own background prompts to the selected model; the agent
+      # would treat them as scenarios, so they are switched off.
+      ENABLE_TITLE_GENERATION: "False"
+      ENABLE_TAGS_GENERATION: "False"
+      ENABLE_FOLLOW_UP_GENERATION: "False"
+      ENABLE_AUTOCOMPLETE_GENERATION: "False"
+      ENABLE_SEARCH_QUERY_GENERATION: "False"
+      ENABLE_RETRIEVAL_QUERY_GENERATION: "False"
+      ENABLE_WEB_SEARCH: "False"
+      ENABLE_IMAGE_GENERATION: "False"
+      ENABLE_CODE_INTERPRETER: "False"
+      ENABLE_COMMUNITY_SHARING: "False"
+      ENABLE_EVALUATION_ARENA_MODELS: "False"
+      WEBUI_BANNERS: >-
+        [{"id":"prototype","type":"info","title":"","dismissible":true,"timestamp":1760140800,
+        "content":"Prototype. Policies are a fictional sample, not any real broadcaster's rules. Low-confidence reviews go to the [human review queue](http://localhost:8000/review)."}]
+      DEFAULT_PROMPT_SUGGESTIONS: >-
+        [{"title":["AI voice clone","in a telco advert"],"content":"A telco advert uses an AI-cloned voice of a famous local singer. The singer has not been contacted."},
+        {"title":["Beer commercial","in the cartoon block"],"content":"A beer brand wants to run its commercial during the Saturday morning cartoon block."},
+        {"title":["Sponsored review","without a label"],"content":"An influencer on our lifestyle channel posts a skincare review the brand paid for, without saying it was sponsored."},
+        {"title":["AI flood footage","in the evening news"],"content":"The evening news wants to illustrate a flood story with AI-generated video of flooded streets, presented as footage from the scene."}]
+
+volumes:
+  open-webui:
+  agent-data:

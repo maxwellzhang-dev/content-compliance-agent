@@ -1,0 +1,137 @@
+# Labelled scenarios for the evaluation harness. `expected` is the verdict a careful
+# reviewer would reach under policies/standards.yaml; `clauses` are the clauses that
+# decide it (retrieval recall is measured against these). `hard: true` marks cases
+# where reasonable reviewers could differ, which the router should tend to escalate.
+
+- id: s01
+  scenario: A social video promoting our new drama uses an AI-generated poster of the lead actors, with no label.
+  expected: conditional
+  clauses: [AI-1]
+- id: s02
+  scenario: An advert for a telco uses an AI-cloned voice of a famous local singer. The singer has not been contacted.
+  expected: not_allowed
+  clauses: [AI-2]
+- id: s03
+  scenario: The evening news wants to illustrate a flood story with AI-generated video of flooded streets, presented as footage from the scene.
+  expected: not_allowed
+  clauses: [AI-3]
+- id: s04
+  scenario: A journalist used an AI assistant to draft a feature article, then edited and fact-checked it before publishing.
+  expected: allowed
+  clauses: [AI-1]
+- id: s05
+  scenario: A beer brand wants to run its commercial during the Saturday morning cartoon block.
+  expected: not_allowed
+  clauses: [ALC-1]
+- id: s06
+  scenario: A whisky advert shows friends celebrating after winning a football match with a toast.
+  expected: not_allowed
+  clauses: [ALC-1]
+- id: s07
+  scenario: A supplement advert says the capsules boost immunity and prevent diabetes.
+  expected: not_allowed
+  clauses: [HLT-1]
+- id: s08
+  scenario: A slimming tea advert promises viewers will lose 5kg in two weeks without changing their diet.
+  expected: not_allowed
+  clauses: [HLT-2]
+- id: s09
+  scenario: An actor in a white coat introduced as Dr Tan recommends a brand of protein shake.
+  expected: not_allowed
+  clauses: [HLT-3]
+- id: s10
+  scenario: A sports betting company wants to sponsor our football highlights show with on-air ads.
+  expected: not_allowed
+  clauses: [GMB-1]
+- id: s11
+  scenario: The news bulletin reports this week's lottery results.
+  expected: allowed
+  clauses: [GMB-1]
+- id: s12
+  scenario: An investment app advert claims guaranteed returns of 8% a year.
+  expected: not_allowed
+  clauses: [FIN-1]
+- id: s13
+  scenario: A licensed bank advertises a unit trust, names itself as the issuer and states that investments can fall in value.
+  expected: allowed
+  clauses: [FIN-1]
+- id: s14
+  scenario: An influencer on our lifestyle channel posts a skincare review that the brand paid for, without saying it was sponsored.
+  expected: conditional
+  clauses: [GEN-3]
+- id: s15
+  scenario: A car maker offers to sponsor a segment of the 9pm news bulletin about road safety.
+  expected: not_allowed
+  clauses: [GEN-2]
+- id: s16
+  scenario: A street interview shows a passer-by's face clearly; they were not asked for consent and the story is a light feature on weekend plans.
+  expected: conditional
+  clauses: [PRV-1]
+- id: s17
+  scenario: A segment on a school sports day shows a 10-year-old's full name, school name and neighbourhood on screen.
+  expected: conditional
+  clauses: [PRV-2]
+- id: s18
+  scenario: A detergent advert claims it is clinically proven to remove 99% of stains; the advertiser has a lab report.
+  expected: allowed
+  clauses: [ADV-1]
+  hard: true
+- id: s19
+  scenario: An advert says our phone plan is cheaper than Brand X, using Brand X's prices from last year.
+  expected: conditional
+  clauses: [ADV-2]
+- id: s20
+  scenario: A comedy sketch gets laughs from a stereotype about a religious group's dietary habits.
+  expected: not_allowed
+  clauses: [GEN-4]
+- id: s21
+  scenario: A toy advert during a kids' show tells children to ask their parents to buy it today.
+  expected: not_allowed
+  clauses: [CHD-1]
+- id: s22
+  scenario: A documentary trailer includes an AI-generated reconstruction of a historical battle, labelled "AI reconstruction".
+  expected: allowed
+  clauses: [AI-1]
+  hard: true
+- id: s23
+  scenario: A satirical clip uses a face swap to show a government minister dancing, labelled as AI parody; the minister has not consented.
+  expected: not_allowed
+  clauses: [AI-2]
+  hard: true
+- id: s24
+  scenario: A crypto exchange that is not licensed locally wants to buy airtime for a brand campaign.
+  expected: not_allowed
+  clauses: [FIN-1]
+
+# Multimodal cases: the decisive facts are in the image, the note says little.
+# Images are synthetic mock-ups drawn by eval/make_images.py.
+- id: m01
+  scenario: Sales wants to know if this sponsor slot can be booked.
+  image: beer_cartoon.png
+  expected: not_allowed
+  clauses: [ALC-1]
+- id: m02
+  scenario: Print-and-TV creative from a new advertiser. OK to air?
+  image: slimming_tea.png
+  expected: not_allowed
+  clauses: [HLT-2]
+- id: m03
+  scenario: Tourism board key visual for our travel show's social posts.
+  image: ai_travel_labelled.png
+  expected: allowed
+  clauses: [AI-1]
+- id: m04
+  scenario: New advertiser creative for the business news break.
+  image: crypto_returns.png
+  expected: not_allowed
+  clauses: [FIN-1]
+- id: m05
+  scenario: Bank creative for the evening finance segment ad break.
+  image: unit_trust_compliant.png
+  expected: allowed
+  clauses: [FIN-1]
+- id: m06
+  scenario: A post from our lifestyle channel's creator. The brand paid for it.
+  image: influencer_post.png
+  expected: conditional
+  clauses: [GEN-3]
