@@ -32,6 +32,10 @@ class Settings:
     review_db_path: str
     review_ui_url: str  # where the /review page is reachable, for links in answers
     api_key: str | None  # bearer token the agent's own API expects, if set
+    speech_key: str | None
+    speech_region: str | None
+    speech_language: str
+    allow_private_video_urls: bool
 
     @property
     def judge_is_reasoning(self) -> bool:
@@ -68,6 +72,11 @@ class Settings:
             review_db_path=os.getenv("REVIEW_DB_PATH", "./reviews.db"),
             review_ui_url=os.getenv("REVIEW_UI_URL", "http://localhost:8000/review"),
             api_key=os.getenv("AGENT_API_KEY") or None,
+            speech_key=os.getenv("AZURE_SPEECH_KEY") or None,
+            speech_region=os.getenv("AZURE_SPEECH_REGION") or None,
+            speech_language=os.getenv("SPEECH_LANGUAGE", "en-US"),
+            allow_private_video_urls=os.getenv("ALLOW_PRIVATE_VIDEO_URLS", "").lower()
+            in {"1", "true", "yes"},
         )
 
 

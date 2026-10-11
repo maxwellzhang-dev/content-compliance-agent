@@ -28,7 +28,9 @@ Decide whether the scenario is allowed under the policy clauses provided, and on
 Before choosing "not_allowed", check whether one of the edits above would cure the
 breach; if one would, the verdict is "conditional".
 When images are attached, they are the content under review: judge what they show, and
-use the written observation only as a reading aid.
+use the written observation only as a reading aid. For a video, the images are frames in
+time order and the audio transcript is part of the content: a breach in the voice-over
+counts the same as one on screen.
 Cite clause IDs exactly as written, e.g. "AI-1". Do not cite clauses you were not given.
 If the clauses do not cover the scenario, say so in the rationale and choose the verdict
 the clauses best support."""
@@ -57,13 +59,18 @@ class Case:
     text: str
     images: list[str] = field(default_factory=list)
     observation: MediaObservation | None = None
+    transcript: str | None = None  # audio track of a video, if any
+    is_video: bool = False  # images are frames sampled from one video, in time order
 
     def query_text(self) -> str:
         """Text used for retrieval, which LightRAG requires to be text only."""
+        parts = [self.text]
+        if self.transcript:
+            parts.append(f"Audio / voice-over: {self.transcript}")
         if self.observation is None:
-            return self.text
+            return "\n".join(parts)
         o = self.observation
-        parts = [self.text, f"Content shows: {o.description}"]
+        parts.append(f"Content shows: {o.description}")
         if o.visible_text:
             parts.append("On-screen text: " + " | ".join(o.visible_text))
         if o.people:
@@ -142,12 +149,18 @@ class OpenAIJudge:
         )
 
     async def observe(self, case):
+        note = f"Reviewer's note: {case.text}"
+        if case.is_video:
+            note += (
+                f"\nThe {len(case.images)} images are frames sampled in time order from one "
+                "video. Describe the video as a whole."
+            )
         msgs = [
             {"role": "system", "content": OBSERVE_SYSTEM},
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": f"Reviewer's note: {case.text}"},
+                    {"type": "text", "text": note},
                     *_image_parts(case.images),
                 ],
             },

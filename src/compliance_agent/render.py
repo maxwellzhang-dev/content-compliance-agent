@@ -12,6 +12,10 @@ VERDICT_LABEL = {
 }
 
 
+def _clip(text: str, limit: int = 500) -> str:
+    return f"“{text}”" if len(text) <= limit else f"“{text[:limit].rstrip()}…”"
+
+
 def _pct(x: float | None) -> str:
     return "n/a" if x is None else f"{x:.0%}"
 
@@ -27,13 +31,20 @@ def render_markdown(review: Review, queue_url: str | None = None) -> str:
     lines += ["", d.rationale, ""]
     o = review.observation
     if o is not None:
-        lines += ["**What the agent saw**", o.description]
-        for label, items in [
+        heading = (
+            "What the agent saw and heard" if review.media == "video" else "What the agent saw"
+        )
+        lines += [f"**{heading}**", o.description]
+        rows = [
             ("On-screen text", [f"“{t}”" for t in o.visible_text]),
             ("People", o.people),
             ("Products", o.products),
             ("Disclosures", o.disclosures or ["none visible"]),
-        ]:
+        ]
+        if review.media == "video":
+            heard = _clip(review.transcript) if review.transcript else "no speech recognised"
+            rows.append(("Voice-over", [heard]))
+        for label, items in rows:
             if items:
                 lines.append(f"- *{label}:* {'; '.join(items)}")
         lines.append("")

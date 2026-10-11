@@ -5,20 +5,28 @@
 * `/api/review` returns the full structured review as JSON.
 * `/api/reviews` lists stored reviews; `/api/reviews/{id}/flag` pulls one into the human
   queue and `/api/reviews/{id}/resolve` records the reviewer's decision.
+* `/api/review-video` reviews an uploaded video (frames + transcribed audio); a video
+  URL pasted into chat is fetched and reviewed the same way.
+* `/submit` is an upload page for an image or video, for clients that cannot attach one.
 * `/review` is the queue as a page with approve / override forms. It has no login and is
   meant for local use (docker compose binds it to 127.0.0.1).
 """
 
 from __future__ import annotations
 
+import base64
 import json
 import os
+import re
+import tempfile
 import time
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Annotated
 from urllib.parse import parse_qs
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel
 
@@ -27,9 +35,15 @@ from .config import Settings, make_async_client
 from .judge import OpenAIJudge
 from .policies import load_corpus
 from .render import render_markdown
-from .review_page import render_queue
+from .review_page import render_detail, render_queue, render_submit
 from .schemas import Verdict
 from .store import ReviewStore
+from .video import MAX_DOWNLOAD_BYTES, VIDEO_SUFFIXES, AzureSpeechTranscriber, download_video
+
+VIDEO_URL = re.compile(
+    r"https?://\S+?(?:" + "|".join(re.escape(x) for x in VIDEO_SUFFIXES) + r")(?:\?\S*)?",
+    re.IGNORECASE,
+)
 
 MODEL_ID = "compliance-agent"
 
@@ -62,7 +76,16 @@ def build_agent(settings: Settings) -> ComplianceAgent:
 
         retriever = LightRAGRetriever(corpus, settings)
     judge = OpenAIJudge(make_async_client(settings), settings)
-    return ComplianceAgent(retriever, judge, settings, ReviewStore(settings.review_db_path))
+    transcriber = (
+        AzureSpeechTranscriber(
+            settings.speech_key, settings.speech_region, settings.speech_language
+        )
+        if settings.speech_key and settings.speech_region
+        else None
+    )
+    return ComplianceAgent(
+        retriever, judge, settings, ReviewStore(settings.review_db_path), transcriber
+    )
 
 
 def create_app(agent: ComplianceAgent | None = None, settings: Settings | None = None) -> FastAPI:
@@ -111,8 +134,22 @@ def create_app(agent: ComplianceAgent | None = None, settings: Settings | None =
                 raise HTTPException(
                     status_code=400, detail="describe the content or attach an image"
                 )
-            review = await request.app.state.agent.review(scenario, images)
-            content = render_markdown(review, settings.review_ui_url)
+            match = VIDEO_URL.search(scenario)
+            if match:
+                note = (scenario[: match.start()] + scenario[match.end() :]).strip()
+                try:
+                    path = await download_video(match.group(0), settings.allow_private_video_urls)
+                except (ValueError, OSError) as exc:
+                    content = f"Could not fetch the video: {exc}"
+                else:
+                    try:
+                        review = await request.app.state.agent.review(note, video=path)
+                    finally:
+                        path.unlink(missing_ok=True)
+                    content = render_markdown(review, settings.review_ui_url)
+            else:
+                review = await request.app.state.agent.review(scenario, images)
+                content = render_markdown(review, settings.review_ui_url)
         cid = f"chatcmpl-{uuid.uuid4().hex[:24]}"
         if body.get("stream"):
             return StreamingResponse(_sse(cid, content), media_type="text/event-stream")
@@ -136,6 +173,50 @@ def create_app(agent: ComplianceAgent | None = None, settings: Settings | None =
             raise HTTPException(status_code=400, detail="scenario or images required")
         review = await request.app.state.agent.review(req.scenario, req.images)
         return review.model_dump(mode="json")
+
+    async def review_upload(request: Request, upload: UploadFile, note: str):
+        data = await upload.read(MAX_DOWNLOAD_BYTES + 1)
+        if len(data) > MAX_DOWNLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="file is larger than 50 MB")
+        ctype = upload.content_type or ""
+        suffix = Path(upload.filename or "").suffix.lower()
+        if ctype.startswith("image/"):
+            url = f"data:{ctype};base64,{base64.b64encode(data).decode()}"
+            return await request.app.state.agent.review(note, [url])
+        if ctype.startswith("video/") or suffix in VIDEO_SUFFIXES:
+            with tempfile.NamedTemporaryFile(suffix=suffix or ".mp4", delete=False) as tmp:
+                tmp.write(data)
+            try:
+                return await request.app.state.agent.review(note, video=tmp.name)
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+            finally:
+                Path(tmp.name).unlink(missing_ok=True)
+        raise HTTPException(status_code=415, detail="upload an image or a video")
+
+    @app.post("/api/review-video", dependencies=[Depends(auth)])
+    async def review_video(
+        request: Request, file: Annotated[UploadFile, File()], scenario: Annotated[str, Form()] = ""
+    ):
+        return (await review_upload(request, file, scenario)).model_dump(mode="json")
+
+    @app.get("/submit", response_class=HTMLResponse)
+    async def submit_page():
+        return render_submit()
+
+    @app.post("/submit")
+    async def submit(
+        request: Request, file: Annotated[UploadFile, File()], note: Annotated[str, Form()] = ""
+    ):
+        review = await review_upload(request, file, note)
+        return RedirectResponse(f"/review/{review.id}", status_code=303)
+
+    @app.get("/review/{review_id}", response_class=HTMLResponse)
+    async def review_detail(review_id: int, request: Request):
+        rec = store(request).get(review_id)
+        if rec is None:
+            raise HTTPException(status_code=404, detail="no such review")
+        return render_detail(rec)
 
     def store(request: Request) -> ReviewStore:
         st = request.app.state.agent.store

@@ -118,7 +118,7 @@ def test_eval_records_failed_cases_instead_of_aborting(make_agent):
     class Boom:
         retriever = None
 
-        async def review(self, scenario, images=None):
+        async def review(self, scenario, images=None, video=None):
             raise RuntimeError("429")
 
     cases = [{"id": "x", "scenario": "s", "expected": "allowed", "clauses": ["AI-1"]}]

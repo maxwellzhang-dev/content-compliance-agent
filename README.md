@@ -2,7 +2,7 @@
 
 A policy Q&A agent for a media compliance desk. You describe a piece of content, for
 example "a telco advert uses an AI-cloned voice of a famous singer", or attach the
-creative itself as an image, and it answers with
+creative itself as an image or video, and it answers with
 a verdict, the policy clauses the verdict rests on, and the changes that would make the
 content compliant. Every answer carries three confidence signals. When any of them is
 weak, the review goes to a human queue instead of being trusted.
@@ -12,6 +12,9 @@ weak, the review goes to a human queue instead of being trusted.
 - **Multimodal input:** attached images go through a vision pass first. What it sees
   (on-screen text, people, products, disclosure labels) becomes part of the retrieval
   query, and the judge then decides with the original image in front of it.
+- **Video:** six frames sampled evenly across the video go to the vision pass, and the
+  audio track is transcribed with Azure AI Speech. A breach that is only spoken
+  ("guaranteed returns") is caught the same as one on screen.
 - **Decision:** Azure OpenAI with structured outputs (Pydantic).
 - **Confidence:** token logprobs, semantic entropy across samples, and a groundedness
   check.
@@ -25,6 +28,9 @@ weak, the review goes to a human queue instead of being trusted.
 ## How a review works
 
 ```
+video? ──► 6 frames + audio ──► Azure Speech transcript ──┐
+                │ frames                                    │ appended to the scenario
+                ▼                                           ▼
 images? ──► vision pass ──► observation (text, people, products, labels)
                                   │ appended to the scenario
                                   ▼
@@ -75,6 +81,7 @@ the first signal shows as n/a and routing uses the other two. It is never estima
 | Structured decision: verdict, rationale, cited clauses, required changes | Implemented |
 | Image input (Open WebUI upload, or `images` on `/api/review`): vision observation, image passed to every judge call, "What the agent saw" shown to the reviewer | Implemented, verified live |
 | Logprob, agreement and groundedness signals; threshold routing with reasons | Implemented, unit-tested |
+| Video input: evenly sampled frames + Azure AI Speech transcript of the audio; upload at `/submit`, `POST /api/review-video`, or a video URL pasted into chat (public hosts only, 50 MB cap) | Implemented, verified live |
 | Every review stored in SQLite, with its route, image and signals | Implemented |
 | Review queue page at `/review`: approve, or override with the correct verdict, deciding clauses and a note | Implemented, verified live |
 | Report an auto-decided review as wrong (`POST /api/reviews/{id}/flag`), pulling it into the queue | Implemented |
@@ -144,6 +151,16 @@ The two errors: crash footage with no warning (h02) was judged `not_allowed` rat
 than `conditional`; the router caught it on agreement (0.54). Scripted "real customer"
 testimonials (h05, marked hard) were judged `not_allowed` with every signal at 100%.
 
+### Video
+
+`eval/video.yaml` has three synthetic adverts, built by `eval/make_videos.py` from
+still scenes and a macOS `say` voice-over. In two of them the breach is **only in the
+voice-over** ("guaranteed twenty percent returns", "lose ten kilos in one week"), and
+the screen shows nothing wrong. Live run: 3/3 correct, both spoken breaches caught with
+every signal at 100%. The compliant beer spot was judged correctly but escalated. Its
+rationale made no policy claim, so groundedness scored 0. That is conservative by
+design: an `allowed` with nothing behind it goes to a person.
+
 ### Threshold calibration, and why the defaults stayed
 
 `compliance-agent calibrate` re-routes recorded cases under every combination of
@@ -190,7 +207,8 @@ docker compose up -d          # agent on :8000, Open WebUI on :3001
 ```
 
 Then open <http://localhost:3001>. The model `compliance-agent` is preselected. The
-review queue is at <http://localhost:8000/review>.
+review queue is at <http://localhost:8000/review>, and images or videos can be uploaded
+at <http://localhost:8000/submit>.
 
 Other commands:
 
@@ -213,6 +231,7 @@ src/compliance_agent/
   lightrag_store.py         LightRAG indexing and mix-mode retrieval → clause IDs
   retrieval.py              offline hybrid retriever (tests/CI), shared result type
   judge.py                  decision, sampling and grounding calls; logprob extraction
+  video.py                  frame sampling, audio extraction, Azure Speech, safe download
   confidence.py             the three signals and the routing rule
   agent.py                  the pipeline
   store.py                  SQLite store of every review; flag / resolve
@@ -226,7 +245,8 @@ eval/scenarios.yaml         dev set: labelled scenarios (text and image)
 eval/heldout.yaml           held-out set, never used for tuning
 eval/*.json                 recorded runs, signals included
 docs/calibration.svg        routing trade-off chart
-eval/images/                synthetic advert mock-ups, drawn by eval/make_images.py
+eval/video.yaml             video cases
+eval/images/, eval/videos/  synthetic adverts, from eval/make_images.py / make_videos.py
 openwebui/custom.css        Open WebUI theme
 docker-compose.yml          agent + Open WebUI
 ```

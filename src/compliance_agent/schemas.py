@@ -81,6 +81,8 @@ class Review(BaseModel):
     id: int | None = None  # set once stored
     scenario: str
     observation: MediaObservation | None = None
+    transcript: str | None = None  # audio of a reviewed video
+    media: str = "text"  # "text" | "image" | "video"
     decision: Decision
     retrieved: list[RetrievedClause]
     confidence: Confidence

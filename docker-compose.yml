@@ -47,7 +47,7 @@ services:
       ENABLE_EVALUATION_ARENA_MODELS: "False"
       WEBUI_BANNERS: >-
         [{"id":"prototype","type":"info","title":"","dismissible":true,"timestamp":1760140800,
-        "content":"Prototype. Policies are a fictional sample, not any real broadcaster's rules. Low-confidence reviews go to the [human review queue](http://localhost:8000/review)."}]
+        "content":"Prototype. Policies are a fictional sample, not any real broadcaster's rules. Low-confidence reviews go to the human review queue at localhost:8000/review. To review a video, paste its URL here or upload it at localhost:8000/submit."}]
       DEFAULT_PROMPT_SUGGESTIONS: >-
         [{"title":["AI voice clone","in a telco advert"],"content":"A telco advert uses an AI-cloned voice of a famous local singer. The singer has not been contacted."},
         {"title":["Beer commercial","in the cartoon block"],"content":"A beer brand wants to run its commercial during the Saturday morning cartoon block."},

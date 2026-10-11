@@ -1,0 +1,17 @@
+# Video cases, kept apart from the dev and held-out sets so those stay comparable.
+# Videos are synthetic (eval/make_videos.py). In v01 and v02 the breach is spoken only.
+- id: v01
+  scenario: New app advertiser wants the business news break.
+  video: v01_crypto_voiceover.mp4
+  expected: not_allowed
+  clauses: [FIN-1]
+- id: v02
+  scenario: Tea brand spot for the afternoon slot.
+  video: v02_slimming_voiceover.mp4
+  expected: not_allowed
+  clauses: [HLT-2]
+- id: v03
+  scenario: Beer spot booked into the 10pm late-night film.
+  video: v03_beer_compliant.mp4
+  expected: allowed
+  clauses: [ALC-1]

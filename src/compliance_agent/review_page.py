@@ -49,7 +49,15 @@ input[name=note]{flex:1;min-width:160px}input[name=clauses]{width:130px}
 button{font:inherit;font-size:14px;padding:6px 12px;border-radius:6px;cursor:pointer;
 border:1px solid var(--line);background:var(--card);color:var(--ink)}
 button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-.outcome{font-size:14px}.empty{color:var(--muted);text-align:center;padding:48px 0}
+.outcome{font-size:14px}.frames{display:flex;gap:6px;overflow-x:auto;padding:4px 0}
+.frames img{width:120px;grid-row:auto}.section{font-size:12px;letter-spacing:.06em;
+text-transform:uppercase;color:var(--muted);margin:10px 0 2px}
+blockquote{margin:4px 0;padding:8px 12px;border-left:3px solid var(--accent);
+background:var(--bg);border-radius:0 6px 6px 0}
+.upload{display:grid;gap:12px;background:var(--card);border:1px solid var(--line);
+border-radius:10px;padding:18px}.upload textarea{font:inherit;padding:8px;border-radius:6px;
+border:1px solid var(--line);background:var(--field);color:var(--ink);min-height:70px}
+.links{font-size:14px;margin-bottom:14px}.links a{color:var(--accent)}.empty{color:var(--muted);text-align:center;padding:48px 0}
 @media (max-width:600px){.card.has-img{grid-template-columns:1fr}.card img{width:100%;
 grid-row:auto}}
 """
@@ -82,7 +90,8 @@ def _card(rec: dict) -> str:
         reasons.insert(0, f"reported: {rec['flag_reason']}")
     reasons_html = "".join(f"<li>{escape(r)}</li>" for r in reasons)
     obs = rv.get("observation")
-    seen = f'<p class="meta">Image: {escape(obs["description"])}</p>' if obs else ""
+    kind = "Video" if rv.get("media") == "video" else "Image"
+    seen = f'<p class="meta">{kind}: {escape(obs["description"])}</p>' if obs else ""
     if rec["status"] == "pending":
         action = f"""<form method="post" action="/review/{rec["id"]}">
 <button class="primary" name="action" value="approve">Approve</button>
@@ -109,7 +118,7 @@ def _card(rec: dict) -> str:
     created = escape(rec["created_at"][:19].replace("T", " "))
     return f"""<article class="card{" has-img" if img else ""}">{img}
 <div class="top"><span class="badge {v}">{VERDICT.get(v, v)}</span>
-<span class="meta">#{rec["id"]} · cites {cites}</span>
+<span class="meta"><a href="/review/{rec["id"]}">#{rec["id"]}</a> · cites {cites}</span>
 <time>{created} UTC</time></div>
 <div class="scenario">{escape(rec["scenario"])}</div>
 {seen}<ul class="reasons">{reasons_html}</ul>
@@ -117,6 +126,59 @@ def _card(rec: dict) -> str:
 <p class="meta">verdict probability {_pct(c["verdict_probability"])} · agreement
 {_pct(c["agreement"])} · groundedness {_pct(c["groundedness"])}</p>
 {action}</article>"""
+
+
+def _page(title: str, body: str) -> str:
+    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{escape(title)}</title><style>{STYLE}</style></head><body><main>
+{body}</main></body></html>"""
+
+
+def render_detail(rec: dict) -> str:
+    """One review in full: the queue card, then everything behind it."""
+    rv = rec["review"]
+    d = rv["decision"]
+    extra = []
+    if rv.get("media") == "video" and len(rec["images"]) > 1:
+        thumbs = "".join(
+            f'<img src="{escape(u)}" alt="Frame {i + 1}">' for i, u in enumerate(rec["images"])
+        )
+        extra.append(f'<p class="section">Frames sampled</p><div class="frames">{thumbs}</div>')
+    if rv.get("transcript"):
+        extra.append(
+            f'<p class="section">Voice-over</p><blockquote>{escape(rv["transcript"])}</blockquote>'
+        )
+    if d["required_changes"]:
+        items = "".join(f"<li>{escape(c)}</li>" for c in d["required_changes"])
+        extra.append(f'<p class="section">Required changes</p><ol>{items}</ol>')
+    by_id = {c["id"]: c for c in rv["retrieved"]}
+    quotes = "".join(
+        f"<blockquote><strong>{escape(cid)}</strong> {escape(by_id[cid]['text'])}</blockquote>"
+        for cid in d["cited_clauses"]
+        if cid in by_id
+    )
+    if quotes:
+        extra.append(f'<p class="section">Cited clauses</p>{quotes}')
+    links = '<p class="links"><a href="/review">← Review queue</a> · <a href="/submit">Submit content</a></p>'
+    body = f"{links}<h1>Review #{rec['id']}</h1>{_card(rec)}" + "".join(extra)
+    return _page(f"Review {rec['id']}", body)
+
+
+def render_submit() -> str:
+    body = """<p class="links"><a href="/review">← Review queue</a></p>
+<h1>Submit content for review</h1>
+<p class="sub">Upload an advert image or video. Videos are sampled into frames and their
+audio is transcribed; both are reviewed against the policy.</p>
+<form class="upload" method="post" action="/submit" enctype="multipart/form-data">
+<label>Image or video (max 50 MB)<br>
+<input type="file" name="file" accept="image/*,video/*" required></label>
+<label>Note for the reviewer (optional)<br>
+<textarea name="note" placeholder="e.g. Sponsor slot in the Saturday morning block"></textarea></label>
+<div><button class="primary" type="submit">Review</button>
+<span class="meta">A video takes 20–60 seconds.</span></div>
+</form>"""
+    return _page("Submit Content", body)
 
 
 def render_queue(records: list[dict], tab: str, counts: dict[str, int]) -> str:
@@ -131,12 +193,13 @@ def render_queue(records: list[dict], tab: str, counts: dict[str, int]) -> str:
         for key, label in TABS
     )
     body = "".join(_card(r) for r in records) or '<p class="empty">Nothing here.</p>'
-    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Review Queue</title><style>{STYLE}</style></head><body><main>
+    return _page(
+        "Review Queue",
+        f"""<p class="links"><a href="/submit">Submit content</a></p>
 <h1>Human review queue</h1>
 <p class="sub">Reviews the agent was not confident enough to decide alone, and decisions
 someone reported as wrong. Approve the agent's verdict or override it; resolved reviews
 become evaluation cases.</p>
 <nav>{nav}</nav>
-{body}</main></body></html>"""
+{body}""",
+    )

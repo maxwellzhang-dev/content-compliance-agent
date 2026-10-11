@@ -4,25 +4,38 @@ score -> route."""
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 
 from . import confidence as conf
 from .config import Settings
 from .judge import Case, Judge
 from .schemas import Confidence, Review
 from .store import ReviewStore
+from .video import gather_evidence
 
 
 class ComplianceAgent:
     def __init__(
-        self, retriever, judge: Judge, settings: Settings, store: ReviewStore | None = None
+        self,
+        retriever,
+        judge: Judge,
+        settings: Settings,
+        store: ReviewStore | None = None,
+        transcriber=None,
     ) -> None:
         self.retriever = retriever
         self.judge = judge
         self.settings = settings
         self.store = store
+        self.transcriber = transcriber  # needed for video audio; None = frames only
 
-    async def review(self, scenario: str, images: list[str] | None = None) -> Review:
+    async def review(
+        self, scenario: str, images: list[str] | None = None, video: str | Path | None = None
+    ) -> Review:
         case = Case(text=scenario or "Review the attached content.", images=list(images or []))
+        if video is not None:
+            evidence = await gather_evidence(video, self.transcriber)
+            case.images, case.transcript, case.is_video = evidence.frames, evidence.transcript, True
         if case.images:
             case.observation = await self.judge.observe(case)
         retrieval = await self.retriever.retrieve(case.query_text())
@@ -47,6 +60,8 @@ class ComplianceAgent:
         review = Review(
             scenario=case.text,
             observation=case.observation,
+            transcript=case.transcript,
+            media="video" if case.is_video else ("image" if case.images else "text"),
             decision=decision,
             retrieved=retrieval.clauses,
             confidence=Confidence(

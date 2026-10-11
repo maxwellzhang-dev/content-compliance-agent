@@ -6,12 +6,15 @@ authors = [{ name = "Zhang Dingpu" }]
 license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
+    "av>=18.1.0",
     "fastapi>=0.143.0",
     "lightrag-hku>=1.5.7",
     "networkx>=3.6.1",
     "numpy>=2.4.6",
     "openai>=3.28.0",
+    "pillow>=12.3.0",
     "pydantic>=2.14.0",
+    "python-multipart>=0.0.32",
     "pyyaml>=6.0.3",
     "uvicorn[standard]>=0.54.0",
 ]
@@ -39,10 +42,10 @@ testpaths = ["tests"]
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
-    "pillow>=12.3.0",
     "pytest>=9.1.1",
     "ruff>=0.17.0",
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "src/compliance_agent/calibrate.py" = ["E501"]  # inline SVG markup
+"src/compliance_agent/review_page.py" = ["E501"]  # inline HTML/CSS

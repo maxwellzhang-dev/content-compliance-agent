@@ -46,6 +46,8 @@ def load_scenarios(path: Path | str = DEFAULT_SCENARIOS) -> list[dict]:
     path = Path(path)
     cases = yaml.safe_load(path.read_text(encoding="utf-8"))
     for case in cases:
+        if "video" in case:
+            case["video_path"] = str(path.parent / "videos" / case["video"])
         if "image" in case:
             img = path.parent / "images" / case["image"]
             mime = "jpeg" if img.suffix.lower() in (".jpg", ".jpeg") else img.suffix[1:].lower()
@@ -64,7 +66,7 @@ def score_case(case: dict, review: Review) -> CaseResult:
         route=review.route,
         recall=len(wanted & retrieved) / len(wanted) if wanted else None,
         hard=bool(case.get("hard")),
-        multimodal=bool(case.get("images")),
+        multimodal=bool(case.get("images") or case.get("video_path")),
         verdict_probability=review.confidence.verdict_probability,
         agreement=review.confidence.agreement,
         groundedness=review.confidence.groundedness,
@@ -111,7 +113,9 @@ async def run(agent, scenarios: list[dict], concurrency: int = 2) -> list[CaseRe
     async def one(case):
         async with sem:
             try:
-                review = await agent.review(case["scenario"], case.get("images"))
+                review = await agent.review(
+                    case["scenario"], case.get("images"), video=case.get("video_path")
+                )
             except Exception as exc:  # noqa: BLE001 - reported per case
                 return CaseResult(
                     id=case["id"],
@@ -120,7 +124,7 @@ async def run(agent, scenarios: list[dict], concurrency: int = 2) -> list[CaseRe
                     route="error",
                     recall=0.0,
                     hard=bool(case.get("hard")),
-                    multimodal=bool(case.get("images")),
+                    multimodal=bool(case.get("images") or case.get("video_path")),
                     error=f"{type(exc).__name__}: {exc}",
                 )
             result = score_case(case, review)
