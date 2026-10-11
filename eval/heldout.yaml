@@ -1,0 +1,127 @@
+# Held-out scenarios. Written after the v2 prompt was frozen and never used to change
+# the prompt or to choose thresholds: they only measure. Labels follow the same
+# conventions as scenarios.yaml (disease claims by non-medicines, pester-power and
+# real-person deepfakes are treated as not_allowed; fixable presentation problems as
+# conditional). The same author wrote the prompt and these labels, so they are
+# independent of tuning, not of the author's reading of the policy.
+
+- id: h01
+  scenario: A news anchor reads out a social media claim that a singer has died, as fact. It has not been confirmed by anyone.
+  expected: conditional
+  clauses: [GEN-1]
+- id: h02
+  scenario: A 7pm crime report shows dashcam footage of a crash with visible injuries, with no warning beforehand.
+  expected: conditional
+  clauses: [GEN-5]
+- id: h03
+  scenario: The weather segment uses an AI-generated animated map of the coming storm, captioned "AI-generated graphic".
+  expected: allowed
+  clauses: [AI-1]
+- id: h04
+  scenario: A radio advert uses an AI voice modelled on a well-known DJ. The DJ signed a release, and the advert says the voice is AI-generated.
+  expected: allowed
+  clauses: [AI-2]
+- id: h05
+  scenario: A shampoo advert shows "real customer" testimonials that were scripted by the agency and performed by actors.
+  expected: conditional
+  clauses: [ADV-3]
+  hard: true
+- id: h06
+  scenario: A yoghurt advert says its probiotics support digestive wellbeing.
+  expected: allowed
+  clauses: [HLT-1]
+- id: h07
+  scenario: A herbal supplement advert says it is clinically proven to cure insomnia.
+  expected: not_allowed
+  clauses: [HLT-1]
+- id: h08
+  scenario: An advert for a registered painkiller says it relieves headaches, which matches its approved indication.
+  expected: allowed
+  clauses: [HLT-1]
+- id: h09
+  scenario: The host of a cooking show keeps praising a soy sauce brand that pays for the show, with no mention of the sponsorship.
+  expected: conditional
+  clauses: [GEN-3]
+- id: h10
+  scenario: A late-night drama has characters drinking beer at a bar. It is a scene in the story, not an advert.
+  expected: allowed
+  clauses: [ALC-1]
+- id: h11
+  scenario: A beer advert shows adults in their thirties at a barbecue and airs at 10pm.
+  expected: allowed
+  clauses: [ALC-1]
+- id: h12
+  scenario: A beer advert shows a man driving home after drinks at a party.
+  expected: not_allowed
+  clauses: [ALC-1]
+- id: h13
+  scenario: An online casino wants to buy a banner on our website.
+  expected: not_allowed
+  clauses: [GMB-1]
+- id: h14
+  scenario: A game show invites viewers to bet on the contestants through a partner betting app.
+  expected: not_allowed
+  clauses: [GMB-1]
+- id: h15
+  scenario: A robo-advisor advert names the licensed firm behind it, states that investments can fall in value, and shows past returns as not guaranteed.
+  expected: allowed
+  clauses: [FIN-1]
+- id: h16
+  scenario: A locally licensed crypto exchange advert names the firm but says nothing about the value of assets falling.
+  expected: conditional
+  clauses: [FIN-1]
+- id: h17
+  scenario: A cereal advert in the kids' block has a cartoon mascot telling children to ask mum to buy it right now.
+  expected: not_allowed
+  clauses: [CHD-1]
+- id: h18
+  scenario: A variety show sketch gets laughs by mocking an ethnic group's accent.
+  expected: not_allowed
+  clauses: [GEN-4]
+- id: h19
+  scenario: A vox pop filmed in a mall shows shoppers' faces; every person signed a release form.
+  expected: allowed
+  clauses: [PRV-1]
+- id: h20
+  scenario: A documentary shot shows a letter on a table with a family's home address readable.
+  expected: conditional
+  clauses: [PRV-1]
+- id: h21
+  scenario: Sales proposes renaming the bulletin "Morning News presented by Brand Y".
+  expected: not_allowed
+  clauses: [GEN-2]
+- id: h22
+  scenario: A toothpaste advert says it is dentists' number one choice; the advertiser holds a survey of 500 dentists supporting it.
+  expected: allowed
+  clauses: [ADV-1]
+  hard: true
+- id: h23
+  scenario: A broadband advert compares its speed with a named rival using an independent like-for-like test from last week.
+  expected: allowed
+  clauses: [ADV-2]
+- id: h24
+  scenario: A satire segment shows a photorealistic AI image of an opposition politician in handcuffs, labelled AI; the politician did not consent.
+  expected: not_allowed
+  clauses: [AI-2]
+  hard: true
+
+- id: hm01
+  scenario: Can this run in our youth music show's ad break?
+  image: heldout_vodka_teens.png
+  expected: not_allowed
+  clauses: [ALC-1]
+- id: hm02
+  scenario: New creative for the morning show break.
+  image: heldout_doctor_gummies.png
+  expected: not_allowed
+  clauses: [HLT-3]
+- id: hm03
+  scenario: A paid post from our lifestyle channel's creator.
+  image: heldout_sponsored_post.png
+  expected: allowed
+  clauses: [GEN-3]
+- id: hm04
+  scenario: Supplement creative for the afternoon slot.
+  image: heldout_energy_supplement.png
+  expected: allowed
+  clauses: [HLT-1]

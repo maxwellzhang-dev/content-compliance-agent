@@ -43,3 +43,6 @@ dev = [
     "pytest>=9.1.1",
     "ruff>=0.17.0",
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"src/compliance_agent/calibrate.py" = ["E501"]  # inline SVG markup

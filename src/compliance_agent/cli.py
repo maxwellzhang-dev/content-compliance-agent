@@ -95,6 +95,10 @@ def main() -> None:
     e = sub.add_parser("eval", help="run the labelled scenarios")
     e.add_argument("--out")
     e.add_argument("--scenarios", help="YAML file of cases (default eval/scenarios.yaml)")
+    k = sub.add_parser("calibrate", help="choose thresholds from recorded eval results")
+    k.add_argument("results", nargs="+", help="results JSON files from `eval --out`, pooled")
+    k.add_argument("--target", type=float, default=0.95, help="minimum auto accuracy")
+    k.add_argument("--svg", help="write the trade-off chart here")
     f = sub.add_parser("export-feedback", help="turn resolved reviews into eval cases")
     f.add_argument("--out", default="eval/feedback.yaml")
     s = sub.add_parser("serve", help="run the API (OpenAI-compatible + JSON)")
@@ -111,6 +115,28 @@ def main() -> None:
         asyncio.run(_ask(args.scenario, settings, args.json))
     elif args.cmd == "eval":
         asyncio.run(_eval(settings, args.out, args.scenarios))
+    elif args.cmd == "calibrate":
+        from pathlib import Path
+
+        from . import calibrate as cal
+
+        cases = cal.load_cases(args.results)
+        points = cal.sweep(cases)
+        front = cal.frontier(points)
+        current = cal.evaluate(
+            cases,
+            cal.Thresholds(
+                settings.min_verdict_probability, settings.min_agreement, settings.min_groundedness
+            ),
+        )
+        rec = cal.recommend(points, args.target)
+        print(f"{len(cases)} cases from {len(args.results)} file(s)\n")
+        print(cal.report(points, front, current, rec, args.target))
+        if args.svg:
+            marks = {"current": current} | ({"recommended": rec} if rec else {})
+            Path(args.svg).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.svg).write_text(cal.render_svg(points, front, marks), encoding="utf-8")
+            print(f"\nchart written to {args.svg}")
     elif args.cmd == "export-feedback":
         from .evaluate import export_feedback
         from .store import ReviewStore

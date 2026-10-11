@@ -57,6 +57,20 @@ def phone_post(d: ImageDraw.ImageDraw) -> None:
     d.rectangle([370, 460, 430, 700], fill="#c9184a")
 
 
+def doctor(d: ImageDraw.ImageDraw) -> None:
+    d.ellipse([340, 470, 460, 590], fill="#f1c27d", outline="black", width=4)
+    d.polygon([(300, 600), (500, 600), (540, 900), (260, 900)], fill="white", outline="#999")
+    d.line([(400, 600), (400, 900)], fill="#999", width=3)
+    d.arc([350, 640, 450, 740], 200, 340, fill="#555", width=5)  # stethoscope
+
+
+def teens(d: ImageDraw.ImageDraw) -> None:
+    for cx, colour in [(250, "#ff70a6"), (550, "#70d6ff")]:
+        d.ellipse([cx - 70, 560, cx + 70, 700], fill="#f1c27d", outline="black", width=4)
+        d.rectangle([cx - 80, 710, cx + 80, 900], fill=colour)
+    d.rounded_rectangle([370, 640, 430, 860], radius=12, fill="#cfe8ff", outline="#555", width=3)
+
+
 def main() -> None:
     OUT.mkdir(exist_ok=True)
     poster(
@@ -125,6 +139,47 @@ def main() -> None:
             ("#skincare #glowup", 28, "#555555"),
         ],
         phone_post,
+    )
+
+    # Held-out cases (eval/heldout.yaml): never used for tuning.
+    poster(
+        "heldout_vodka_teens",
+        "#3a0ca3",
+        [
+            ("FROST VODKA", 76, "white"),
+            ("SCHOOL'S OUT PARTY PACK", 46, "#ffd60a"),
+            ("Back-to-school specials for students", 30, "white"),
+        ],
+        teens,
+    )
+    poster(
+        "heldout_doctor_gummies",
+        "#e0fbfc",
+        [
+            ("VitaJoy Gummies", 64, "#3d5a80"),
+            ('"I recommend them to all my patients"', 34, "#293241"),
+            ("- Dr. Lim, family physician", 30, "#293241"),
+        ],
+        doctor,
+    )
+    poster(
+        "heldout_sponsored_post",
+        "#eeeeee",
+        [
+            ("Sponsored · Paid partnership with GlowSkin", 26, "#c9184a"),
+            ("@glowwithmei", 36, "#222222"),
+            ("Trying the new GlowSkin serum", 30, "#222222"),
+        ],
+        phone_post,
+    )
+    poster(
+        "heldout_energy_supplement",
+        "#fff3b0",
+        [
+            ("SunBoost B-Complex", 62, "#e09f3e"),
+            ("Supports energy and everyday wellbeing", 34, "#540b0e"),
+            ("Food supplement. Use as part of a balanced diet.", 26, "#335c67"),
+        ],
     )
 
 

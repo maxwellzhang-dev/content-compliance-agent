@@ -31,6 +31,11 @@ class CaseResult:
     hard: bool
     multimodal: bool = False
     error: str | None = None
+    # raw signals, so thresholds can be re-chosen later without re-running the model
+    verdict_probability: float | None = None
+    agreement: float | None = None
+    groundedness: float | None = None
+    hard_fail: bool = False  # escalated whatever the thresholds (stray citation, nothing found)
 
     @property
     def correct(self) -> bool:
@@ -60,6 +65,12 @@ def score_case(case: dict, review: Review) -> CaseResult:
         recall=len(wanted & retrieved) / len(wanted) if wanted else None,
         hard=bool(case.get("hard")),
         multimodal=bool(case.get("images")),
+        verdict_probability=review.confidence.verdict_probability,
+        agreement=review.confidence.agreement,
+        groundedness=review.confidence.groundedness,
+        hard_fail=any(
+            r.startswith(("cites clauses", "no policy clause")) for r in review.route_reasons
+        ),
     )
 
 
