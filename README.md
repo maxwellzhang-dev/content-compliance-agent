@@ -89,6 +89,7 @@ the first signal shows as n/a and routing uses the other two. It is never estima
 | Every review stored in SQLite, with its route, image and signals | Implemented |
 | Review queue page at `/review`: approve, or override with the correct verdict, deciding clauses and a note | Implemented, verified live |
 | Report an auto-decided review as wrong (`POST /api/reviews/{id}/flag`), pulling it into the queue | Implemented |
+| "Report wrong verdict" button under every answer in Open WebUI (an Action function): asks for a reason, then flags the review | Implemented, verified live; `python openwebui/install_actions.py` |
 | Resolved reviews exported as eval cases (`compliance-agent export-feedback`), reviewer verdict as the expected answer | Implemented |
 | OpenAI-compatible `/v1/models` and `/v1/chat/completions`, streaming included | Implemented |
 | Open WebUI: branding, example prompts, banner, theme CSS, background task calls disabled | Implemented (docker compose) |
@@ -224,6 +225,7 @@ uv sync
 uv run compliance-agent index # build the LightRAG index (~1 min, 20 clauses)
 uv run compliance-agent ask "A beer brand wants to advertise during the Saturday cartoon block."
 docker compose up -d          # agent on :8000, Open WebUI on :3001
+python openwebui/install_actions.py   # adds the "Report wrong verdict" button
 ```
 
 Then open <http://localhost:3001>. The model `compliance-agent` is preselected. The
@@ -270,6 +272,8 @@ docs/calibration.svg        routing trade-off chart
 eval/video.yaml             video cases
 eval/images/, eval/videos/  synthetic adverts, from eval/make_images.py / make_videos.py
 openwebui/custom.css        Open WebUI theme
+openwebui/actions/          Open WebUI action functions (report wrong verdict)
+openwebui/install_actions.py  installs them through Open WebUI's API
 docker-compose.yml          agent + Open WebUI
 ```
 

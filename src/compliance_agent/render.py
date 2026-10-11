@@ -186,5 +186,5 @@ def render_markdown(review: Review, queue_url: str | None = None) -> str:
             if queue_url and review.route != "auto"
             else ""
         )
-        lines += ["", f"<sub>{t['review']} #{review.id}{where}</sub>"]
+        lines += ["", f"*{t['review']} #{review.id}{where}*"]
     return "\n".join(lines)

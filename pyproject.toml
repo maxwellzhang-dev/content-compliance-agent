@@ -49,3 +49,4 @@ dev = [
 [tool.ruff.lint.per-file-ignores]
 "src/compliance_agent/calibrate.py" = ["E501"]  # inline SVG markup
 "src/compliance_agent/review_page.py" = ["E501"]  # inline HTML/CSS
+"openwebui/actions/*.py" = ["E501"]  # Open WebUI frontmatter carries an inline icon
